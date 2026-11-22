@@ -45,3 +45,4 @@ prove verify.judge-workflow-tests crates/judge-workflow-tests/tests/verified_bra
 prove verify.judge-workflow-evidence-tests crates/judge-workflow-tests/tests/verified_evidence.rs
 prove verify.judge-workflow-certificate-tests crates/judge-workflow-tests/tests/verified_certificate.rs
 prove verify.judge-workflow-transition-tests crates/judge-workflow-tests/tests/verified_transition.rs
+prove verify.judge-workflow-execution-tests crates/judge-workflow-tests/tests/verified_execution.rs
