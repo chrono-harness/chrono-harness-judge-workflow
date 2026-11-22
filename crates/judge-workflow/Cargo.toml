@@ -17,7 +17,6 @@ bench = false
 [dependencies]
 chrono-harness = { git = "https://github.com/chrono-harness/chrono-harness-runner.git", rev = "a1cff08f74d996d618372f20adc203d1b5904d50" }
 chrono-judge-registration = { git = "https://github.com/chrono-harness/chrono-harness-judge-registration.git", rev = "76530cce04ad04ebda2f71a16a8a51f930c2daa8" }
-chrono-judge-filemap = { git = "https://github.com/chrono-harness/chrono-harness-judge-filemap.git", rev = "545c03a0df4259921d927e3e9fffd9fa2b65c68d" }
 chrono-judge-routes = { git = "https://github.com/chrono-harness/chrono-harness-judge-routes.git", rev = "de64456d6571db07ead2dcc2476e7adee551a955" }
 chrono-judge-projects = { git = "https://github.com/chrono-harness/chrono-harness-judge-projects.git", rev = "01713b83aec1bef595770b28dc8a4c8f12f67e4b" }
 serde_json = "1"

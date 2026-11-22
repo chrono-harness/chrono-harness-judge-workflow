@@ -143,7 +143,6 @@ name = "chrono-judge-workflow"
 version = "0.1.0"
 dependencies = [
  "chrono-harness",
- "chrono-judge-filemap",
  "chrono-judge-projects",
  "chrono-judge-registration",
  "chrono-judge-routes",
