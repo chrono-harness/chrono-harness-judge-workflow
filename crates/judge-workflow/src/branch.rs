@@ -21,6 +21,25 @@ fn moment(v: &Value, k: &str) -> Result<OffsetDateTime, String> {
 pub fn observation_age(ctx: &Value, w: &Value) -> Result<time::Duration, String> {
     age_at(ctx, w, moment(ctx, "observed_at")?)
 }
+/// Check the local context producer's original timestamps with the same policy as the judge.
+pub fn check_observation_age(input: impl std::io::Read) -> Result<(), (u8, String)> {
+    let request: Value = serde_json::from_reader(input).map_err(|error| {
+        (
+            2,
+            format!("E_BRANCH_CONTEXT: invalid observation request: {error}"),
+        )
+    })?;
+    observation_age(&request["context"], &request["workflow"])
+        .map(|_| ())
+        .map_err(|message| {
+            let code = if message.starts_with("E_BRANCH_STALE:") {
+                1
+            } else {
+                2
+            };
+            (code, message)
+        })
+}
 /// Admission can observe now without changing the original common context.
 pub fn current_observation_age(
     ctx: &Value,
