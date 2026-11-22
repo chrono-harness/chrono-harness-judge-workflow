@@ -5,7 +5,7 @@
 mod policy;
 
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
+use vstd::prelude::verus;
 use policy::{ConversionFacts, MigrationError, MigrationFacts};
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
