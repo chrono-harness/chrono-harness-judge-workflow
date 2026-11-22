@@ -6,6 +6,8 @@ trap 'rm -rf -- "$scratch"' EXIT
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$scratch/cargo}"
 cargo fmt --check --manifest-path crates/judge-workflow/Cargo.toml
 cargo build --locked --manifest-path crates/judge-workflow/Cargo.toml
+cargo fmt --check --manifest-path crates/judge-workflow-tests/Cargo.toml
+cargo test --locked --manifest-path crates/judge-workflow-tests/Cargo.toml
 proof_bindings=()
 prove() {
   local label=$1 root=$2
@@ -39,3 +41,7 @@ prove verify.judge-workflow-evidence crates/judge-workflow/src/verified_evidence
 prove verify.judge-workflow-execution crates/judge-workflow/src/verified_execution.rs
 prove verify.judge-workflow-certificate crates/judge-workflow/src/verified_certificate.rs
 prove verify.judge-workflow-transition crates/judge-workflow/src/verified_transition.rs
+prove verify.judge-workflow-tests crates/judge-workflow-tests/tests/verified_branch.rs
+prove verify.judge-workflow-evidence-tests crates/judge-workflow-tests/tests/verified_evidence.rs
+prove verify.judge-workflow-certificate-tests crates/judge-workflow-tests/tests/verified_certificate.rs
+prove verify.judge-workflow-transition-tests crates/judge-workflow-tests/tests/verified_transition.rs

@@ -1,0 +1,26 @@
+[package]
+name = "chrono-judge-workflow-tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+chrono-judge-workflow = { path = "../judge-workflow" }
+chrono-harness = { git = "https://github.com/chrono-harness/chrono-harness-runner.git", rev = "a1cff08f74d996d618372f20adc203d1b5904d50" }
+
+[[test]]
+name = "verified_branch"
+path = "tests/verified_branch.rs"
+
+[[test]]
+name = "verified_evidence"
+path = "tests/verified_evidence.rs"
+
+[[test]]
+name = "verified_certificate"
+path = "tests/verified_certificate.rs"
+
+[[test]]
+name = "verified_transition"
+path = "tests/verified_transition.rs"
