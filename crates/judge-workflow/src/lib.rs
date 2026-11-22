@@ -8,7 +8,7 @@ mod verified_certificate;
 mod verified_evidence;
 mod verified_execution;
 mod verified_transition;
-pub use branch::{branch, current_observation_age, observation_age};
+pub use branch::{branch, check_observation_age, current_observation_age, observation_age};
 use chrono_harness::{
     facts, json,
     wire::{self, Finding, Request, Response, Status},
