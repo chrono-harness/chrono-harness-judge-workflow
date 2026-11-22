@@ -5,8 +5,7 @@ mod freshness;
 #[path = "../../judge-workflow/src/verified_execution.rs"]
 mod policy;
 
-#[cfg(verus_keep_ghost)]
-use vstd::prelude::*;
+use vstd::{contrib::exec_spec::ExecSpecEq, prelude::*};
 
 #[cfg(verus_keep_ghost)]
 use vstd::string::StringSliceAdditionalSpecFns;
@@ -38,7 +37,7 @@ fn expect_code(actual: &str, expected: &str)
         vstd::utf8::encode_utf8_decode_utf8(actual@);
         vstd::utf8::encode_utf8_decode_utf8(expected@);
     }
-    let same = policy::response::identifiers::equal_text(actual, expected);
+    let same = <&str>::exec_eq(actual, expected);
     expect(same);
 }
 
@@ -56,32 +55,32 @@ fn all_five_domain_rejections_have_fail_status() {
         assert(vstd::string::is_ascii("E_REQUIRED_TEST_REMOVED: test:a:b") && vstd::string::is_ascii("E_REQUIRED_TEST_REMOVED"));
         assert(vstd::string::is_ascii("E_INTEGRATION_REQUIRED:") && vstd::string::is_ascii("E_INTEGRATION_REQUIRED"));
         assert(vstd::string::is_ascii("E_INTEGRATION_MISMATCH: mismatch") && vstd::string::is_ascii("E_INTEGRATION_MISMATCH"));
-        policy::response::identifiers::ascii_separator_end_is("E_BRANCH_STALE: stale".spec_bytes(), 58, 14);
-        policy::response::identifiers::ascii_separator_end_is("E_RETIREMENT".spec_bytes(), 58, 12);
-        policy::response::identifiers::ascii_separator_end_is("E_REQUIRED_TEST_REMOVED: test:a:b".spec_bytes(), 58, 23);
-        policy::response::identifiers::ascii_separator_end_is("E_INTEGRATION_REQUIRED:".spec_bytes(), 58, 22);
-        policy::response::identifiers::ascii_separator_end_is("E_INTEGRATION_MISMATCH: mismatch".spec_bytes(), 58, 22);
+        policy::response::code_ends_at("E_BRANCH_STALE: stale".spec_bytes(), 14);
+        policy::response::code_ends_at("E_RETIREMENT".spec_bytes(), 12);
+        policy::response::code_ends_at("E_REQUIRED_TEST_REMOVED: test:a:b".spec_bytes(), 23);
+        policy::response::code_ends_at("E_INTEGRATION_REQUIRED:".spec_bytes(), 22);
+        policy::response::code_ends_at("E_INTEGRATION_MISMATCH: mismatch".spec_bytes(), 22);
         assert("E_BRANCH_STALE: stale".spec_bytes().take(14) =~= "E_BRANCH_STALE".spec_bytes());
         assert("E_RETIREMENT".spec_bytes().take(12) =~= "E_RETIREMENT".spec_bytes());
         assert("E_REQUIRED_TEST_REMOVED: test:a:b".spec_bytes().take(23) =~= "E_REQUIRED_TEST_REMOVED".spec_bytes());
         assert("E_INTEGRATION_REQUIRED:".spec_bytes().take(22) =~= "E_INTEGRATION_REQUIRED".spec_bytes());
         assert("E_INTEGRATION_MISMATCH: mismatch".spec_bytes().take(22) =~= "E_INTEGRATION_MISMATCH".spec_bytes());
     }
-    let (code, status) = policy::response::classify_error("E_BRANCH_STALE: stale");
+    let (code, rejected) = policy::response::classify_error("E_BRANCH_STALE: stale", true, false);
     expect_code(code, "E_BRANCH_STALE");
-    expect(matches!(status, policy::response::Status::Fail));
-    let (code, status) = policy::response::classify_error("E_RETIREMENT");
+    expect(rejected);
+    let (code, rejected) = policy::response::classify_error("E_RETIREMENT", true, false);
     expect_code(code, "E_RETIREMENT");
-    expect(matches!(status, policy::response::Status::Fail));
-    let (code, status) = policy::response::classify_error("E_REQUIRED_TEST_REMOVED: test:a:b");
+    expect(rejected);
+    let (code, rejected) = policy::response::classify_error("E_REQUIRED_TEST_REMOVED: test:a:b", true, false);
     expect_code(code, "E_REQUIRED_TEST_REMOVED");
-    expect(matches!(status, policy::response::Status::Fail));
-    let (code, status) = policy::response::classify_error("E_INTEGRATION_REQUIRED:");
+    expect(rejected);
+    let (code, rejected) = policy::response::classify_error("E_INTEGRATION_REQUIRED:", true, false);
     expect_code(code, "E_INTEGRATION_REQUIRED");
-    expect(matches!(status, policy::response::Status::Fail));
-    let (code, status) = policy::response::classify_error("E_INTEGRATION_MISMATCH: mismatch");
+    expect(rejected);
+    let (code, rejected) = policy::response::classify_error("E_INTEGRATION_MISMATCH: mismatch", true, false);
     expect_code(code, "E_INTEGRATION_MISMATCH");
-    expect(matches!(status, policy::response::Status::Fail));
+    expect(rejected);
 }
 
 #[cfg_attr(not(verus_keep_ghost), test)]
@@ -97,27 +96,27 @@ fn invalid_prefixes_preserve_the_workflow_fallback() {
         assert(vstd::string::is_ascii("") && vstd::string::is_ascii(":E_BRANCH_STALE"));
         assert(vstd::string::is_ascii("e_BRANCH_STALE: lower") && vstd::string::is_ascii(" E_BRANCH_STALE: space"));
         assert(vstd::string::is_ascii("E: short") && vstd::string::is_ascii("E_WORKFLOW_INPUT"));
-        policy::response::identifiers::ascii_separator_end_is("".spec_bytes(), 58, 0);
-        policy::response::identifiers::ascii_separator_end_is(":E_BRANCH_STALE".spec_bytes(), 58, 0);
-        policy::response::identifiers::ascii_separator_end_is("e_BRANCH_STALE: lower".spec_bytes(), 58, 14);
-        policy::response::identifiers::ascii_separator_end_is(" E_BRANCH_STALE: space".spec_bytes(), 58, 15);
-        policy::response::identifiers::ascii_separator_end_is("E: short".spec_bytes(), 58, 1);
+        policy::response::code_ends_at("".spec_bytes(), 0);
+        policy::response::code_ends_at(":E_BRANCH_STALE".spec_bytes(), 0);
+        policy::response::code_ends_at("e_BRANCH_STALE: lower".spec_bytes(), 14);
+        policy::response::code_ends_at(" E_BRANCH_STALE: space".spec_bytes(), 15);
+        policy::response::code_ends_at("E: short".spec_bytes(), 1);
     }
-    let (code, status) = policy::response::classify_error("");
+    let (code, rejected) = policy::response::classify_error("", true, false);
     expect_code(code, "E_WORKFLOW_INPUT");
-    expect(matches!(status, policy::response::Status::Error));
-    let (code, status) = policy::response::classify_error(":E_BRANCH_STALE");
+    expect(!rejected);
+    let (code, rejected) = policy::response::classify_error(":E_BRANCH_STALE", true, false);
     expect_code(code, "E_WORKFLOW_INPUT");
-    expect(matches!(status, policy::response::Status::Error));
-    let (code, status) = policy::response::classify_error("e_BRANCH_STALE: lower");
+    expect(!rejected);
+    let (code, rejected) = policy::response::classify_error("e_BRANCH_STALE: lower", true, false);
     expect_code(code, "E_WORKFLOW_INPUT");
-    expect(matches!(status, policy::response::Status::Error));
-    let (code, status) = policy::response::classify_error(" E_BRANCH_STALE: space");
+    expect(!rejected);
+    let (code, rejected) = policy::response::classify_error(" E_BRANCH_STALE: space", true, false);
     expect_code(code, "E_WORKFLOW_INPUT");
-    expect(matches!(status, policy::response::Status::Error));
-    let (code, status) = policy::response::classify_error("E: short");
+    expect(!rejected);
+    let (code, rejected) = policy::response::classify_error("E: short", true, false);
     expect_code(code, "E_WORKFLOW_INPUT");
-    expect(matches!(status, policy::response::Status::Error));
+    expect(!rejected);
 }
 
 #[cfg_attr(not(verus_keep_ghost), test)]
@@ -134,9 +133,9 @@ fn complete_code_identity_is_required_for_a_rejection() {
         assert(vstd::string::is_ascii("E_BRANCH_STALE_SUFFIX: detail") && vstd::string::is_ascii("E_BRANCH_STALE_SUFFIX"));
         assert(vstd::string::is_ascii("E_BRANCH_STALE\0: detail") && vstd::string::is_ascii("E_BRANCH_STALE\0"));
         assert(vstd::string::is_ascii("E_:") && vstd::string::is_ascii("E_"));
-        policy::response::identifiers::ascii_separator_end_is("E_BRANCH_STALE_SUFFIX: detail".spec_bytes(), 58, 21);
-        policy::response::identifiers::ascii_separator_end_is("E_BRANCH_STALE\0: detail".spec_bytes(), 58, 15);
-        policy::response::identifiers::ascii_separator_end_is("E_:".spec_bytes(), 58, 2);
+        policy::response::code_ends_at("E_BRANCH_STALE_SUFFIX: detail".spec_bytes(), 21);
+        policy::response::code_ends_at("E_BRANCH_STALE\0: detail".spec_bytes(), 15);
+        policy::response::code_ends_at("E_:".spec_bytes(), 2);
         assert('雪' as u32 == 38634 && '后' as u32 == 21518 && '文' as u32 == 25991);
         assert(vstd::utf8::encode_scalar(38634) == seq![233u8, 155, 170]) by (compute);
         assert(vstd::utf8::encode_scalar(21518) == seq![229u8, 144, 142]) by (compute);
@@ -148,24 +147,24 @@ fn complete_code_identity_is_required_for_a_rejection() {
         reveal_with_fuel(vstd::utf8::encode_utf8, 9);
         assert("E_雪\0:后:文".spec_bytes() =~= seq![69u8, 95, 233, 155, 170, 0, 58, 229, 144, 142, 58, 230, 150, 135]);
         assert("E_雪\0".spec_bytes() =~= seq![69u8, 95, 233, 155, 170, 0]);
-        policy::response::identifiers::ascii_separator_end_is("E_雪\0:后:文".spec_bytes(), 58, 6);
+        policy::response::code_ends_at("E_雪\0:后:文".spec_bytes(), 6);
         assert("E_BRANCH_STALE_SUFFIX: detail".spec_bytes().take(21) =~= "E_BRANCH_STALE_SUFFIX".spec_bytes());
         assert("E_BRANCH_STALE\0: detail".spec_bytes().take(15) =~= "E_BRANCH_STALE\0".spec_bytes());
         assert("E_:".spec_bytes().take(2) =~= "E_".spec_bytes());
         assert("E_雪\0:后:文".spec_bytes().take(6) =~= "E_雪\0".spec_bytes());
     }
-    let (code, status) = policy::response::classify_error("E_BRANCH_STALE_SUFFIX: detail");
+    let (code, rejected) = policy::response::classify_error("E_BRANCH_STALE_SUFFIX: detail", true, false);
     expect_code(code, "E_BRANCH_STALE_SUFFIX");
-    expect(matches!(status, policy::response::Status::Error));
-    let (code, status) = policy::response::classify_error("E_BRANCH_STALE\0: detail");
+    expect(!rejected);
+    let (code, rejected) = policy::response::classify_error("E_BRANCH_STALE\0: detail", true, false);
     expect_code(code, "E_BRANCH_STALE\0");
-    expect(matches!(status, policy::response::Status::Error));
-    let (code, status) = policy::response::classify_error("E_雪\0:后:文");
+    expect(!rejected);
+    let (code, rejected) = policy::response::classify_error("E_雪\0:后:文", true, false);
     expect_code(code, "E_雪\0");
-    expect(matches!(status, policy::response::Status::Error));
-    let (code, status) = policy::response::classify_error("E_:");
+    expect(!rejected);
+    let (code, rejected) = policy::response::classify_error("E_:", true, false);
     expect_code(code, "E_");
-    expect(matches!(status, policy::response::Status::Error));
+    expect(!rejected);
 }
 
 #[cfg_attr(not(verus_keep_ghost), test)]

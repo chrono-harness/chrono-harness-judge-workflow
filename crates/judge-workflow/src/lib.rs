@@ -32,7 +32,8 @@ pub fn judge(req: &Request) -> Response {
             r.outputs.insert("workflow".into(), v);
         }
         Err(message) => {
-            let (code, severity) = verified_execution::response::classify_error(&message);
+            let (code, severity) =
+                verified_execution::response::classify_error(&message, Status::Fail, Status::Error);
             let code = code.to_string();
             wire::append_finding(
                 &mut r.status,

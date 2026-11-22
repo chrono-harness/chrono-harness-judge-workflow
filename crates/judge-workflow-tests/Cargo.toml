@@ -6,6 +6,7 @@ publish = false
 autotests = false
 
 [dependencies]
+vstd = "=0.0.0-2026-04-20-1748"
 chrono-judge-workflow = { path = "../judge-workflow" }
 chrono-harness = { git = "https://github.com/chrono-harness/chrono-harness-runner.git", rev = "a1cff08f74d996d618372f20adc203d1b5904d50" }
 
@@ -24,3 +25,7 @@ path = "tests/verified_certificate.rs"
 [[test]]
 name = "verified_transition"
 path = "tests/verified_transition.rs"
+
+[[test]]
+name = "verified_execution"
+path = "tests/verified_execution.rs"
