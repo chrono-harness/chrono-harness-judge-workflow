@@ -1,8 +1,8 @@
 //! Public evidence from the installed projects judge. Only workflow's inputs are projected.
 use crate::query::invoke;
+use crate::registration::Registry;
 use crate::routes::Execution;
 use chrono_harness::wire::Request;
-use chrono_judge_registration::Registrations;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -57,11 +57,7 @@ struct Reply {
     results: Value,
 }
 
-pub fn read(
-    req: &Request,
-    registry: &Registrations,
-    raw: &Value,
-) -> Result<ProjectEvidence, String> {
+pub fn read(req: &Request, registry: &Registry, raw: &Value) -> Result<ProjectEvidence, String> {
     let output = invoke(req, registry, "projects", "read-results-v1", raw)?;
     let reply: Reply = serde_json::from_slice(&output).map_err(|e| e.to_string())?;
     let results = Results::deserialize(&reply.results).map_err(|e| e.to_string())?;
@@ -74,7 +70,7 @@ pub fn read(
 
 pub fn check_collection(
     req: &Request,
-    registry: &Registrations,
+    registry: &Registry,
     effective: &Value,
     plan: &Execution,
     results: &ProjectEvidence,

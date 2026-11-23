@@ -1,18 +1,35 @@
+use crate::registration::Registry;
 use chrono_harness::{CommandSpec, run_process, run_process_observed, wire::Request};
-use chrono_judge_registration::Registrations;
 use serde_json::Value;
 
 pub(crate) fn invoke(
     req: &Request,
-    registry: &Registrations,
+    registry: &Registry,
+    judge_id: &str,
+    command: &str,
+    query: &Value,
+) -> Result<Vec<u8>, String> {
+    run(
+        req,
+        &registry.config,
+        &registry.judges,
+        judge_id,
+        command,
+        query,
+    )
+}
+
+pub(crate) fn run(
+    req: &Request,
+    config: &Value,
+    judges: &Value,
     judge_id: &str,
     command: &str,
     query: &Value,
 ) -> Result<Vec<u8>, String> {
     let name = format!("chrono-judge-{judge_id}");
-    let config = registry.config();
     let tools = config["tools"].as_array().ok_or("missing workflow tools")?;
-    let judges = registry.judges()["judges"]
+    let judges = judges["judges"]
         .as_array()
         .ok_or("missing workflow judges")?;
     let registered = tools.iter().find(|tool| tool["id"] == name);

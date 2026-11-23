@@ -1,22 +1,22 @@
 use crate::projects::Results;
+use crate::registration::Registry;
 use chrono_harness::{facts, wire::Request};
-use chrono_judge_registration::{Registrations, retirement_declaration as declaration};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 /// Adjudicate changed/removed identities; unchanged historical records are context.
 pub fn evaluate(
     reader: &facts::Reader,
     req: &Request,
-    a: &Registrations,
-    b: &Registrations,
+    b: &Registry,
     impact: &Value,
     results: &Results,
-    view: &Value,
     costs: &Value,
 ) -> Result<Value, String> {
-    let old = a.node_data();
-    let new = b.node_data();
-    let requests = chrono_judge_registration::retirement_requests(b)?;
+    let changes = b
+        .changes
+        .as_ref()
+        .ok_or("missing workflow transition declarations")?;
+    let requests = changes.requests.as_ref().map_err(Clone::clone)?;
     let mut decisions = vec![];
     let mut ambiguities = vec![];
     for required in impact["required_tests"]
@@ -24,19 +24,15 @@ pub fn evaluate(
         .ok_or("E_RETIREMENT: missing obligations")?
     {
         let node = required["node"].as_str().ok_or("E_RETIREMENT: test node")?;
-        let Some(defs) = old.get(node).filter(|n| n.definitions.len() > 1) else {
+        let Some(ambiguity) = changes.ambiguities.get(node) else {
             continue;
         };
-        let definitions: Vec<_> = defs
-            .definitions
-            .iter()
-            .map(|d| d.identity.clone())
-            .collect();
+        let definitions = &ambiguity.definitions;
         let target = requests
             .get(node)
             .and_then(|v| v.as_deref())
             .unwrap_or(node);
-        if !chrono_judge_registration::ambiguity_repaired(b, node, &definitions)
+        if !ambiguity.repaired
             || results.tests.get(target).map(String::as_str) != Some("passed")
             || costs["declared_before"].get(node).is_none()
         {
@@ -48,12 +44,11 @@ pub fn evaluate(
             json!({"node":node,"definitions":definitions,"replacement":target,"status":"repaired"}),
         );
     }
-    for node in old.keys() {
-        if !node.starts_with("test:") || new.contains_key(node) {
-            continue;
-        }
-        let id = &node[5..];
-        let request = chrono_judge_registration::validate_test_retirement(a, b, node)?;
+    for (node, replacement) in &changes.removed_tests {
+        let id = node
+            .strip_prefix("test:")
+            .ok_or("invalid removed test identity")?;
+        let request = replacement.as_ref().map_err(Clone::clone)?;
         if request
             .as_ref()
             .is_some_and(|to| results.tests.get(to).map(String::as_str) != Some("passed"))
@@ -66,7 +61,7 @@ pub fn evaluate(
             .as_array()
             .unwrap()
             .contains(&json!(node))
-            && results.removed.get(node) != Some(&request)
+            && results.removed.get(node) != Some(request)
         {
             return Err("E_RETIREMENT: execution did not preserve removed obligation".into());
         }
@@ -75,41 +70,9 @@ pub fn evaluate(
         }
         decisions.push(json!({"kind":"test","id":id,"replacement":request,"status":if request.is_some(){"replaced"}else{"retired"},"executed_old_test":false}));
     }
-    for (collection, kind) in [
-        ("projects", "project"),
-        ("scripts", "script"),
-        ("judges", "judge"),
-    ] {
-        let old_rows: Vec<&Value> = if collection == "judges" {
-            a.judges()[collection].as_array().unwrap().iter().collect()
-        } else {
-            // Include explicitly retained historical definitions removed by a decoder.
-            old.iter()
-                .filter(|(node, _)| node.starts_with(&format!("{kind}:")))
-                .flat_map(|(_, node)| node.definitions.iter().map(|d| d.value))
-                .collect()
-        };
-        let new_rows = if collection == "judges" {
-            &b.judges()[collection]
-        } else {
-            &b.projects()[collection]
-        };
-        for row in old_rows {
-            if row.get("tests_for").is_some() {
-                continue;
-            }
-            let id = row["id"].as_str().unwrap();
-            if new_rows.as_array().unwrap().iter().any(|p| p["id"] == id) {
-                continue;
-            }
-            let d = declaration(b, kind, id)?;
-            if let Some(to) = d["replacement"].as_str() {
-                if !new_rows.as_array().unwrap().iter().any(|p| p["id"] == to) {
-                    return Err("E_RETIREMENT: replacement identity missing".into());
-                }
-            }
-            decisions.push(json!({"kind":kind,"id":id,"replacement":d["replacement"],"status":"declared-removal"}));
-        }
+    for owner in &changes.removed_owners {
+        let replacement = owner.replacement.as_ref().map_err(Clone::clone)?;
+        decisions.push(json!({"kind": owner.kind, "id": owner.id, "replacement": replacement, "status":"declared-removal"}));
     }
     let raw = reader.registry_values(&req.candidate.root, &req.base.commit, &req.config_path)?;
     let now =
@@ -138,7 +101,7 @@ pub fn evaluate(
     }
     let mut migrations = vec![];
     for (from, to) in changes {
-        let rows: Vec<_> = b.workflow()["migrations"]
+        let rows: Vec<_> = b.workflow["migrations"]
             .as_array()
             .unwrap()
             .iter()
@@ -147,7 +110,7 @@ pub fn evaluate(
         super::verified_transition::admit_declaration(rows.len())
             .map_err(super::verified_transition::MigrationError::message)?;
         let m = rows[0];
-        let c = &view["conversion"];
+        let c = &b.conversion;
         let test = m
             .get("test")
             .and_then(Value::as_str)

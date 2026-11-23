@@ -4,6 +4,7 @@ mod certificate;
 mod evidence;
 mod projects;
 mod query;
+mod registration;
 mod routes;
 mod transition;
 mod verified_branch;
@@ -22,12 +23,15 @@ use serde_json::{Value, json as value};
 pub fn judge(req: &Request) -> Response {
     let mut r = req.response(Status::Pass);
     let reader = facts::Reader::for_request(req);
+    let mut queries = registration::QueryFacts::default();
     let result = reader
         .as_ref()
         .map_err(Clone::clone)
-        .and_then(|reader| evaluate(req, reader));
+        .and_then(|reader| evaluate(req, reader, &mut queries));
     if let Ok(reader) = &reader {
-        reader.record(&mut r);
+        if reader.is_bound() {
+            r.outputs.insert("git_facts".into(), queries.finish(reader));
+        }
     }
     match result {
         Ok(v) => {
@@ -53,9 +57,14 @@ pub fn judge(req: &Request) -> Response {
     }
     r
 }
-fn evaluate(req: &Request, reader: &facts::Reader) -> Result<Value, String> {
+fn evaluate(
+    req: &Request,
+    reader: &facts::Reader,
+    queries: &mut registration::QueryFacts,
+) -> Result<Value, String> {
     req.validate()?;
-    let (a, b, view) = chrono_judge_registration::views_with_reader(req, reader)?;
+    let b: registration::Registry = serde_json::from_value(queries.read(req, reader, false)?)
+        .map_err(|e| format!("invalid registration workflow view: {e}"))?;
     let ctx = json(&std::fs::read(&req.context.path).map_err(|e| e.to_string())?)?;
     if wire::digest(&ctx)? != req.context.sha256
         || ctx["schema_version"] != 2
@@ -69,14 +78,14 @@ fn evaluate(req: &Request, reader: &facts::Reader) -> Result<Value, String> {
         &req.candidate.root,
         &req.candidate.commit,
         &ctx,
-        b.workflow(),
+        &b.workflow,
     )?;
     let observation = &req.observations["preparation"]["result"]["evidence"]["current_observation"];
     if !observation.is_null() {
         if observation["context_digest"] != req.context.sha256 {
             return Err("E_BRANCH_CONTEXT: current observation context binding differs".into());
         }
-        let age = branch::current_observation_age(&ctx, b.workflow(), observation)?;
+        let age = branch::current_observation_age(&ctx, &b.workflow, observation)?;
         state["age_seconds"] = value!(age.as_seconds_f64());
         state["current_observation"] = observation.clone();
     }
@@ -98,8 +107,8 @@ fn evaluate(req: &Request, reader: &facts::Reader) -> Result<Value, String> {
     let plan: Execution = serde_json::from_value(evidence::output(req, "execution_plan")?.clone())
         .map_err(|e| e.to_string())?;
     let results = projects::read(req, &b, evidence::output(req, "tests")?)?;
-    let effective = chrono_judge_registration::inputs::validate(req, &a, &b)?;
-    let binding = evidence::binding(req, &b, &plan, &results, impact, &effective)?;
+    let effective = b.effective_inputs.as_ref().map_err(Clone::clone)?;
+    let binding = evidence::binding(req, &b, &plan, &results, impact, effective)?;
     if let Some(chrono_harness::units::Scope::Unit { unit }) = &req.scope {
         let global_selected = req
             .prior_results
@@ -131,23 +140,22 @@ fn evaluate(req: &Request, reader: &facts::Reader) -> Result<Value, String> {
     let transitions = transition::evaluate(
         reader,
         req,
-        &a,
         &b,
         impact,
         &results.results,
-        &view,
         evidence::output(req, "costs")?,
     )?;
     certificate::validate_bind(&b)?;
     let (mode, integration) = if ctx["run_kind"] == "integration" {
         (
             "integration_run",
-            certificate::produce(req, &b, &ctx, binding, &plan, &results, &effective)?,
+            certificate::produce(req, &b, &ctx, binding, &plan, &results, effective)?,
         )
     } else if required {
         (
             "delivery",
             certificate::consume(
+                queries,
                 reader,
                 req,
                 &b,
