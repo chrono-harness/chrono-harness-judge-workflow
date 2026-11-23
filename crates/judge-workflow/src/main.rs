@@ -1,6 +1,11 @@
 fn main() -> std::process::ExitCode {
     let mut args = std::env::args_os().skip(1);
-    if args.next().as_deref() == Some(std::ffi::OsStr::new("check-observation-age")) {
+    let first = args.next();
+    if first.as_deref() == Some(std::ffi::OsStr::new("--version")) && args.len() == 0 {
+        println!("chrono-judge-workflow {}", env!("CARGO_PKG_VERSION"));
+        return std::process::ExitCode::SUCCESS;
+    }
+    if first.as_deref() == Some(std::ffi::OsStr::new("check-observation-age")) {
         if args.next().is_some() {
             eprintln!("E_USAGE: check-observation-age reads JSON from stdin");
             return 2.into();
