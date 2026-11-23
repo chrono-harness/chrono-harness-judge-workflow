@@ -21,3 +21,5 @@
 workflow 使用宿主固定的 `chrono-judge-routes` 核对原始执行计划和操作回执。集成证据与交付复核都使用同一发行的 `check-plan-receipts-v1`、`plan-context-v1` 和 `collection-plan-v1`。计划顺序、回执匹配和参数展开由 routes 解释。workflow 核对交付上下文、测试完成情况、收集义务和原始报告，再产生工作流判定。
 
 完整工作流还调用已固定的 registration 发行中的 `workflow-views-v1`。两个端点的原始登记从宿主指定提交读取。registration 解释登记、输入和退役声明，workflow 使用实际执行结果、旧成本和原始报告判定集成与交付。
+
+本仓的生产清单、测试清单和锁文件仅引用本仓与第三方 Rust 包。完整判官通过 PATH 调用宿主安装的 `chrono-harness` 读取固定 Git 事实、核对封存请求和原进程回执，并在交付复核期间保护原件。分支有效期查询仍可单独使用。两个提交端点、注册的工具和 SHA-256、证书中的结果摘要及各判官的原始进程继续参与集成与交付判定。

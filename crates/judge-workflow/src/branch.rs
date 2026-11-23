@@ -1,5 +1,5 @@
+use crate::facts;
 use crate::verified_branch::{self, SourceKind};
-use chrono_harness::facts;
 use serde_json::{Value, json};
 use std::{collections::BTreeSet, path::Path};
 use time::{OffsetDateTime, UtcOffset, format_description::well_known::Rfc3339};
@@ -81,19 +81,15 @@ fn age_at(ctx: &Value, w: &Value, observed: OffsetDateTime) -> Result<time::Dura
     }
     Ok(age)
 }
-fn commits(reader: &facts::Reader, root: &Path, oid: &str) -> Result<BTreeSet<String>, String> {
-    Ok(facts::utf8(reader.git(root, &["rev-list", oid])?)?
-        .lines()
-        .map(str::to_string)
-        .collect())
-}
 /// Fixed Git/context inputs only. No branch discovery, wall clock or commit-date inference.
 pub fn branch(root: &Path, candidate: &str, ctx: &Value, w: &Value) -> Result<Value, String> {
-    with_reader(&facts::Reader::legacy(), root, candidate, ctx, w)
+    let reader = facts::Reader::legacy(root)?;
+    let result = with_reader(&reader, candidate, ctx, w);
+    reader.finish()?;
+    result
 }
 pub fn with_reader(
     reader: &facts::Reader,
-    root: &Path,
     candidate: &str,
     ctx: &Value,
     w: &Value,
@@ -102,7 +98,7 @@ pub fn with_reader(
     let fork = text(ctx, "fork_point")?;
     for oid in [candidate, dev, fork] {
         reader
-            .verify_oid(root, oid)
+            .verify_oid(oid)
             .map_err(|e| format!("E_HISTORY_MISSING: {e}"))?;
     }
     if ctx["base"] != dev {
@@ -110,7 +106,7 @@ pub fn with_reader(
     }
     let source = text(ctx, "branch_ref")?;
     reader
-        .git(root, &["check-ref-format", &format!("refs/heads/{source}")])
+        .call::<()>(json!({"op":"check-branch-name","branch":source}))
         .map_err(|e| format!("E_BRANCH_CONTEXT: invalid Git branch name: {e}"))?;
     let feature_prefix = text(w, "feature_prefix")?;
     let integration_prefix = text(w, "integration_prefix")?;
@@ -131,22 +127,19 @@ pub fn with_reader(
         SourceKind::Integration => "integration",
     };
     let age = observation_age(ctx, w)?;
-    let dev_ancestors = commits(reader, root, dev)?;
-    let branch_ancestors = commits(reader, root, candidate)?;
+    let dev_ancestors = reader.call::<BTreeSet<String>>(json!({"op":"ancestors","commit":dev}))?;
+    let branch_ancestors =
+        reader.call::<BTreeSet<String>>(json!({"op":"ancestors","commit":candidate}))?;
     // Shallow boundaries are acceptable only at/before the proven fork. Any other
     // truncated relevant history prevents a complete count or ancestry decision.
-    let fork_ancestors = commits(reader, root, fork)?;
-    let shallow_path = facts::utf8(reader.git(root, &["rev-parse", "--git-path", "shallow"])?)?;
-    let path = root.join(shallow_path.trim());
-    if path.exists() {
-        let shallow =
-            std::fs::read_to_string(path).map_err(|e| format!("E_HISTORY_MISSING: {e}"))?;
-        for s in shallow.lines() {
-            if (dev_ancestors.contains(s) || branch_ancestors.contains(s))
-                && !fork_ancestors.contains(s)
-            {
-                return Err("E_HISTORY_MISSING: truncated ancestry beyond fork".into());
-            }
+    let fork_ancestors =
+        reader.call::<BTreeSet<String>>(json!({"op":"ancestors","commit":fork}))?;
+    let boundaries: Vec<String> = reader.call(json!({"op":"shallow-boundaries"}))?;
+    for s in &boundaries {
+        if (dev_ancestors.contains(s) || branch_ancestors.contains(s))
+            && !fork_ancestors.contains(s)
+        {
+            return Err("E_HISTORY_MISSING: truncated ancestry beyond fork".into());
         }
     }
     if !dev_ancestors.contains(fork) || !branch_ancestors.contains(fork) {

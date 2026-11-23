@@ -1,6 +1,6 @@
 //! Consume interpreted registration data while the workflow reader owns its endpoint observations.
+use crate::{facts, wire::Request};
 use crate::{query, routes::Method};
-use chrono_harness::{facts, wire::Request};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -42,7 +42,7 @@ pub struct QueryFacts(Vec<(usize, Vec<Value>)>);
 
 impl QueryFacts {
     fn record(&mut self, reader: &facts::Reader, mut extra: Value) -> Result<(), String> {
-        let mut original = reader.observation();
+        let mut original = reader.observation()?;
         let header = original
             .as_object_mut()
             .ok_or("E_GIT_FACTS: unbound workflow reader")?;
@@ -62,15 +62,15 @@ impl QueryFacts {
         Ok(())
     }
 
-    pub fn finish(self, reader: &facts::Reader) -> Value {
-        let mut observed = reader.observation();
+    pub fn finish(self, reader: &facts::Reader) -> Result<Value, String> {
+        let mut observed = reader.observation()?;
         if let Some(processes) = observed["processes"].as_array_mut() {
             // Positions refer to the local reader before any external observations are inserted.
             for (position, records) in self.0.into_iter().rev() {
                 processes.splice(position..position, records);
             }
         }
-        observed
+        Ok(observed)
     }
 
     pub fn read(
@@ -79,9 +79,8 @@ impl QueryFacts {
         reader: &facts::Reader,
         replay: bool,
     ) -> Result<Value, String> {
-        let root = &req.candidate.root;
-        let base = reader.registry_snapshot(root, &req.base.commit, &req.config_path)?;
-        let current = reader.registry_snapshot(root, &req.candidate.commit, &req.config_path)?;
+        let base = reader.snapshot("base")?;
+        let current = reader.snapshot("candidate")?;
         let config = &current.values[&current.effective_path];
         let judges = current
             .values
@@ -91,18 +90,8 @@ impl QueryFacts {
                     .ok_or("missing judges registry")?,
             )
             .ok_or("missing judges document")?;
-        let documents = |bytes: BTreeMap<String, Vec<u8>>| {
-            bytes
-                .into_iter()
-                .map(|(k, v)| {
-                    String::from_utf8(v)
-                        .map(|v| (k, v))
-                        .map_err(|e| e.to_string())
-                })
-                .collect::<Result<BTreeMap<_, _>, _>>()
-        };
         let input = json!({"request":req,"replay":replay,
-            "originals":[documents(base.bytes)?,documents(current.bytes)?]});
+            "originals":[base.originals,current.originals]});
         let raw = query::run(
             req,
             config,
@@ -111,7 +100,7 @@ impl QueryFacts {
             "workflow-views-v1",
             &input,
         )?;
-        let mut output: Value = chrono_harness::decode(&raw)?;
+        let mut output: Value = req.decode(&raw)?;
         if output["request_id"] != req.request_id
             || output["commits"] != json!([req.base.commit, req.candidate.commit])
         {

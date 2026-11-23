@@ -1,6 +1,12 @@
 use crate::registration::Registry;
-use chrono_harness::{CommandSpec, run_process, run_process_observed, wire::Request};
+use crate::wire::Request;
+use serde::Deserialize;
 use serde_json::Value;
+use serde_json::json;
+use std::{
+    io::Write,
+    process::{Command, Stdio},
+};
 
 pub(crate) fn invoke(
     req: &Request,
@@ -65,35 +71,70 @@ pub(crate) fn run(
     } else {
         program.to_owned()
     };
-    let spec = CommandSpec {
-        program,
-        args: vec![command.into()],
-        env: serde_json::from_value(req.observations["environment"]["effective"].clone())
-            .map_err(|e| e.to_string())?,
-        timeout_seconds: config["protocol"]["timeout_seconds"]
-            .as_u64()
-            .ok_or("invalid protocol timeout")?,
-        output_limit_bytes: config["protocol"]["stdout_limit_bytes"]
-            .as_u64()
-            .and_then(|n| usize::try_from(n).ok())
-            .ok_or("invalid protocol output bound")?,
-    };
-    let input = serde_json::to_vec(query).map_err(|e| e.to_string())?;
-    let process = if let Some(digest) = digest {
-        run_process_observed(&req.candidate.root, &spec, &input, digest)?
-    } else {
-        run_process(&req.candidate.root, &spec, &input)?
-    };
-    if let Some(cause) = process.failure {
-        return Err(cause);
+    let limit = config["protocol"]["stdout_limit_bytes"]
+        .as_u64()
+        .and_then(|n| usize::try_from(n).ok())
+        .ok_or("invalid protocol output bound")?;
+    let environment: std::collections::BTreeMap<String, String> =
+        serde_json::from_value(req.observations["environment"]["effective"].clone())
+            .map_err(|e| e.to_string())?;
+    let timeout = config["protocol"]["timeout_seconds"]
+        .as_u64()
+        .ok_or("invalid protocol timeout")?;
+    let mut header = json!({"program":program,"args":[command],"env":environment,"timeout_seconds":timeout,"output_limit_bytes":limit});
+    if let Some(digest) = digest {
+        header["expected_sha256"] = json!(digest);
     }
-    if process.exit_code != 0 {
-        let diagnostic = String::from_utf8(process.stderr_bytes).map_err(|e| e.to_string())?;
+    let mut child = Command::new("chrono-harness")
+        .arg("run-command-v1")
+        .current_dir(&req.candidate.root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    let mut input = child.stdin.take().unwrap();
+    let written = (|| -> Result<(), String> {
+        serde_json::to_writer(&mut input, &header).map_err(|e| e.to_string())?;
+        input.write_all(b"\n").map_err(|e| e.to_string())?;
+        serde_json::to_writer(&mut input, query).map_err(|e| e.to_string())
+    })();
+    drop(input);
+    let output = child.wait_with_output().map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr)
+            .trim_end_matches('\n')
+            .into());
+    }
+    written?;
+    #[derive(Deserialize)]
+    struct Lengths {
+        exit_code: i32,
+        stdout_length: usize,
+        stderr_length: usize,
+    }
+    let end = output
+        .stdout
+        .iter()
+        .position(|b| *b == b'\n')
+        .ok_or("missing command result header")?;
+    let lengths: Lengths =
+        serde_json::from_slice(&output.stdout[..end]).map_err(|e| e.to_string())?;
+    let data = &output.stdout[end + 1..];
+    if lengths.stdout_length > limit
+        || lengths.stderr_length > limit
+        || lengths.stdout_length.checked_add(lengths.stderr_length) != Some(data.len())
+    {
+        return Err("invalid command result lengths".into());
+    }
+    let (stdout, stderr) = data.split_at(lengths.stdout_length);
+    if lengths.exit_code != 0 {
+        let diagnostic = std::str::from_utf8(stderr).map_err(|e| e.to_string())?;
         return Err(if diagnostic.is_empty() {
-            format!("{name} {command} exited with {}", process.exit_code)
+            format!("{name} {command} exited with {}", lengths.exit_code)
         } else {
             diagnostic.trim_end_matches('\n').into()
         });
     }
-    Ok(process.stdout_bytes)
+    Ok(stdout.to_owned())
 }

@@ -1,6 +1,6 @@
 use crate::projects::Results;
 use crate::registration::Registry;
-use chrono_harness::{facts, wire::Request};
+use crate::{facts, wire::Request};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 /// Adjudicate changed/removed identities; unchanged historical records are context.
@@ -74,14 +74,11 @@ pub fn evaluate(
         let replacement = owner.replacement.as_ref().map_err(Clone::clone)?;
         decisions.push(json!({"kind": owner.kind, "id": owner.id, "replacement": replacement, "status":"declared-removal"}));
     }
-    let raw = reader.registry_values(&req.candidate.root, &req.base.commit, &req.config_path)?;
-    let now =
-        reader.registry_values(&req.candidate.root, &req.candidate.commit, &req.config_path)?;
+    let base = reader.snapshot("base")?;
+    let current = reader.snapshot("candidate")?;
+    let (raw, raw_config) = (base.values, base.effective_path);
+    let (now, now_config) = (current.values, current.effective_path);
     let mut changes = BTreeSet::new();
-    let raw_config =
-        chrono_harness::facts::registry_identity(&raw, &req.config_path)?.effective_path;
-    let now_config =
-        chrono_harness::facts::registry_identity(&now, &req.config_path)?.effective_path;
     for key in ["config", "filemap", "projects", "judges", "workflow"] {
         let op = if key == "config" {
             raw_config.as_str()
@@ -120,21 +117,21 @@ pub fn evaluate(
             .and_then(|test| results.tests.get(test))
             .map(String::as_str)
             == Some("passed");
-        let conversion =
-            serde_json::from_value::<chrono_harness::ProcessResult>(c["process"].clone())
-                .ok()
-                .map(|p| super::verified_transition::ConversionFacts {
-                    process_succeeded: super::evidence::process(&p).is_ok(),
-                    declared_input_digest_matches: c["input_digest"] == p.stdin_sha256,
-                    actual_input_digest_matches: chrono_harness::wire::digest(&c["input"])
-                        .map(|digest| digest == p.stdin_sha256)
-                        .ok(),
-                    output_digest_matches: c["output_digest"] == p.stdout_sha256,
-                    decoded_output_matches: chrono_harness::decode::<Value>(&p.stdout_bytes)
-                        .map(|output| c["output"] == output)
-                        .ok(),
-                    mappings_match: c["output"]["mappings"] == m["mappings"],
-                });
+        let conversion = serde_json::from_value::<crate::wire::Process>(c["process"].clone())
+            .ok()
+            .map(|p| super::verified_transition::ConversionFacts {
+                process_succeeded: super::evidence::process(req, &p).is_ok(),
+                declared_input_digest_matches: c["input_digest"] == p.stdin_sha256,
+                actual_input_digest_matches: crate::wire::digest(&c["input"])
+                    .map(|digest| digest == p.stdin_sha256)
+                    .ok(),
+                output_digest_matches: c["output_digest"] == p.stdout_sha256,
+                decoded_output_matches: req
+                    .decode::<Value>(&p.stdout_bytes)
+                    .map(|output| c["output"] == output)
+                    .ok(),
+                mappings_match: c["output"]["mappings"] == m["mappings"],
+            });
         super::verified_transition::admit_migration(super::verified_transition::MigrationFacts {
             declaration_count: rows.len(),
             has_script: m.get("script").is_some(),

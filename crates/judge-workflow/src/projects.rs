@@ -2,7 +2,7 @@
 use crate::query::invoke;
 use crate::registration::Registry;
 use crate::routes::Execution;
-use chrono_harness::wire::Request;
+use crate::wire::Request;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 // Projects returns a fully decoded original receipt. Retain its route-owned fields for replay.
 #[derive(serde::Serialize, Deserialize)]
 pub struct Receipt {
-    pub process: chrono_harness::ProcessResult,
+    pub process: crate::wire::Process,
     #[serde(flatten)]
     fields: BTreeMap<String, Value>,
 }

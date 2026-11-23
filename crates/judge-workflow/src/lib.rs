@@ -14,58 +14,68 @@ mod verified_execution;
 mod verified_transition;
 use crate::routes::Execution;
 pub use branch::{branch, check_observation_age, current_observation_age, observation_age};
-use chrono_harness::{
-    facts, json,
-    wire::{self, Finding, Request, Response, Status},
-};
+mod facts;
+mod session;
+mod wire;
+use crate::wire::{Request, Status};
 use serde_json::{Value, json as value};
 
-pub fn judge(req: &Request) -> Response {
-    let mut r = req.response(Status::Pass);
-    let reader = facts::Reader::for_request(req);
-    let mut queries = registration::QueryFacts::default();
-    let result = reader
-        .as_ref()
-        .map_err(Clone::clone)
-        .and_then(|reader| evaluate(req, reader, &mut queries));
-    if let Ok(reader) = &reader {
-        if reader.is_bound() {
-            r.outputs.insert("git_facts".into(), queries.finish(reader));
-        }
+pub fn evaluate_original(
+    input: impl std::io::Read,
+    mut output: impl std::io::Write,
+) -> Result<(), String> {
+    #[derive(serde::Deserialize)]
+    struct Prepared {
+        request: Request,
+        admission: Result<(), String>,
     }
-    match result {
-        Ok(v) => {
-            r.outputs.insert("workflow".into(), v);
+    let Prepared {
+        mut request,
+        admission,
+    } = serde_json::from_reader(input).map_err(|e| e.to_string())?;
+    let mut outputs = serde_json::Map::new();
+    let run = || -> Result<Value, String> {
+        admission?;
+        let reader = facts::Reader::for_request(&request)?;
+        let mut queries = registration::QueryFacts::default();
+        let result = evaluate(&request, &reader, &mut queries);
+        if reader.bound {
+            outputs.insert("git_facts".into(), queries.finish(&reader)?);
+        }
+        reader.finish()?;
+        result
+    };
+    let result = run();
+    let (status, findings) = match request.finish().and(result) {
+        Ok(verdict) => {
+            outputs.insert("workflow".into(), verdict);
+            (Status::Pass, Vec::new())
         }
         Err(message) => {
             let (code, severity) =
                 verified_execution::response::classify_error(&message, Status::Fail, Status::Error);
-            let code = code.to_string();
-            wire::append_finding(
-                &mut r.status,
-                &mut r.findings,
+            (
                 severity,
-                Finding {
-                    code,
-                    level: "error".into(),
-                    message,
-                    delta_refs: vec!["/request/context".into()],
-                    causes: vec![],
-                },
-            );
+                vec![
+                    value!({"code":code,"level":"error","message":message,"delta_refs":["/request/context"],"causes":[]}),
+                ],
+            )
         }
-    }
-    r
+    };
+    serde_json::to_writer(
+        &mut output,
+        &value!({"status":status,"findings":findings,"outputs":outputs}),
+    )
+    .map_err(|e| e.to_string())
 }
 fn evaluate(
     req: &Request,
     reader: &facts::Reader,
     queries: &mut registration::QueryFacts,
 ) -> Result<Value, String> {
-    req.validate()?;
     let b: registration::Registry = serde_json::from_value(queries.read(req, reader, false)?)
         .map_err(|e| format!("invalid registration workflow view: {e}"))?;
-    let ctx = json(&std::fs::read(&req.context.path).map_err(|e| e.to_string())?)?;
+    let ctx: Value = req.decode(&std::fs::read(&req.context.path).map_err(|e| e.to_string())?)?;
     if wire::digest(&ctx)? != req.context.sha256
         || ctx["schema_version"] != 2
         || ctx["candidate"] != req.candidate.commit
@@ -73,13 +83,7 @@ fn evaluate(
     {
         return Err("E_BRANCH_CONTEXT: workflow requires matching explicit v2 context".into());
     }
-    let mut state = branch::with_reader(
-        reader,
-        &req.candidate.root,
-        &req.candidate.commit,
-        &ctx,
-        &b.workflow,
-    )?;
+    let mut state = branch::with_reader(reader, &req.candidate.commit, &ctx, &b.workflow)?;
     let observation = &req.observations["preparation"]["result"]["evidence"]["current_observation"];
     if !observation.is_null() {
         if observation["context_digest"] != req.context.sha256 {
@@ -109,7 +113,7 @@ fn evaluate(
     let results = projects::read(req, &b, evidence::output(req, "tests")?)?;
     let effective = b.effective_inputs.as_ref().map_err(Clone::clone)?;
     let binding = evidence::binding(req, &b, &plan, &results, impact, effective)?;
-    if let Some(chrono_harness::units::Scope::Unit { unit }) = &req.scope {
+    if let Some(wire::Scope::Unit { unit }) = &req.scope {
         let global_selected = req
             .prior_results
             .iter()
@@ -119,10 +123,7 @@ fn evaluate(
         let selected: std::collections::BTreeSet<String> =
             serde_json::from_value(global_selected.clone())
                 .map_err(|e| format!("E_WORKFLOW_INPUT: global selection: {e}"))?;
-        let units: std::collections::BTreeMap<String, chrono_harness::units::Unit> =
-            serde_json::from_value(req.observations["execution_units"]["units"].clone())
-                .map_err(|e| format!("E_WORKFLOW_INPUT: execution units: {e}"))?;
-        let required_units = chrono_harness::units::required(&units, &selected);
+        let required_units:Vec<String>=req.evidence(value!({"operation":"required-units","units":req.observations["execution_units"]["units"],"selected":selected})).map_err(|e|format!("E_WORKFLOW_INPUT: execution units: {e}"))?;
         return Ok(value!({
             "schema":"chrono-workflow-verdict/v1",
             "mode":"contribution",
