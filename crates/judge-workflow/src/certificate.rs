@@ -1,11 +1,11 @@
 use crate::projects::{self, ProjectEvidence};
+use crate::routes::{self, Execution};
 use crate::{evidence, verified_certificate};
 use chrono_harness::{
     json, no_symlink_parents, sha256,
     wire::{self, Request},
 };
 use chrono_judge_registration::Registrations;
-use chrono_judge_routes::Execution;
 use serde_json::{Value, json as value};
 use std::{collections::BTreeSet, fs, path::Path};
 const FIELDS: [&str; 9] = [
@@ -181,7 +181,7 @@ pub fn consume(
         let plan: Execution =
             serde_json::from_value(proof["plan"].clone()).map_err(|e| e.to_string())?;
         let results = projects::read(req, r, &proof["results"])?;
-        evidence::execution(&plan, &results)?;
+        evidence::execution(req, r, &plan, &results)?;
         if c["results_digest"] != wire::digest(&results.wire)?
             || plan.root != Path::new(producer["root"].as_str().ok_or("producer root")?)
             || plan.binding["candidate"] != candidate
@@ -300,23 +300,22 @@ pub fn consume(
             if original.request_id != producer["request_id"]
                 || original.impact != req.impact
                 || plan.binding
-                    != chrono_judge_routes::binding(original, &proof["effective_inputs"])
+                    != routes::context(
+                        req,
+                        r,
+                        original,
+                        &proof["effective_inputs"],
+                        &Default::default(),
+                    )?
+                    .binding
             {
                 return Err("collected producer stdin/global obligation binding differs".into());
             }
             let current_plan: Execution =
                 serde_json::from_value(evidence::output(req, "execution_plan")?.clone())
                     .map_err(|e| e.to_string())?;
-            let expected = chrono_judge_routes::prepare_collection(
-                &plan.root,
-                plan.binding.clone(),
-                &current_plan.selected.keys().cloned().collect(),
-                &chrono_judge_registration::execution::plans(r.filemap())?,
-                &chrono_judge_registration::execution::methods(r.projects())?,
-                &chrono_judge_routes::execute_actions(r),
-                current_plan.environment,
-            )?;
-            if serde_json::to_value(&expected).map_err(|e| e.to_string())? != proof["plan"] {
+            let expected = routes::collection(req, r, &plan, &current_plan)?;
+            if expected != proof["plan"] {
                 return Err("collected global declaration plan differs".into());
             }
             // Retain the workflow reader's observations for the fixed registration endpoints.
