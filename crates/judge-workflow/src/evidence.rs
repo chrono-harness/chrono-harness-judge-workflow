@@ -1,4 +1,5 @@
 use crate::projects::{self, ProjectEvidence};
+use crate::routes::{self, Execution};
 use crate::verified_evidence;
 use crate::verified_execution;
 use chrono_harness::{
@@ -6,7 +7,6 @@ use chrono_harness::{
     wire::{self, Request, Response, Status},
 };
 use chrono_judge_registration::Registrations;
-use chrono_judge_routes::Execution;
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -28,7 +28,7 @@ pub fn output<'a>(req: &'a Request, key: &str) -> Result<&'a Value, String> {
     Ok(values[0])
 }
 pub fn process(p: &ProcessResult) -> Result<(), String> {
-    chrono_judge_routes::process_success(p)
+    chrono_harness::observation::process_success(p)
 }
 pub fn record(v: &Value) -> Result<(Response, ProcessResult), String> {
     let expanded = chrono_harness::full::expand_record(v)?;
@@ -53,19 +53,53 @@ pub fn record(v: &Value) -> Result<(Response, ProcessResult), String> {
     }
     Ok((r, p))
 }
-pub fn execution(plan: &Execution, evidence: &ProjectEvidence) -> Result<(), String> {
-    execution_inner(plan, evidence, false)
-}
-pub fn contribution(plan: &Execution, evidence: &ProjectEvidence) -> Result<(), String> {
-    execution_inner(plan, evidence, true)
+pub fn execution(
+    req: &Request,
+    registry: &Registrations,
+    plan: &Execution,
+    evidence: &ProjectEvidence,
+) -> Result<(), String> {
+    execution_inner(req, registry, plan, evidence, false)
 }
 fn execution_inner(
+    req: &Request,
+    registry: &Registrations,
     plan: &Execution,
     evidence: &ProjectEvidence,
     contribution: bool,
 ) -> Result<(), String> {
     let results = &evidence.results;
-    plan.validate()?;
+    let receipts: BTreeMap<_, _> = results
+        .executed
+        .iter()
+        .filter_map(|row| {
+            row.receipt
+                .as_ref()
+                .map(|receipt| (row.operation.as_str(), receipt))
+        })
+        .collect();
+    let reply = crate::query::invoke(
+        req,
+        registry,
+        "routes",
+        "check-plan-receipts-v1",
+        &json!({"plan":plan,"receipts":receipts}),
+    )?;
+    #[derive(serde::Deserialize)]
+    struct ReceiptChecks {
+        plan: String,
+        operations: BTreeMap<String, Option<String>>,
+    }
+    let checks: ReceiptChecks = serde_json::from_slice(&reply).map_err(|e| e.to_string())?;
+    if checks.plan != plan.identity
+        || checks.operations.len() != plan.operations.len()
+        || !plan
+            .operations
+            .iter()
+            .all(|op| checks.operations.contains_key(&op.method.operation))
+    {
+        return Err("E_WORKFLOW_EVIDENCE: route receipt query identity".into());
+    }
     let selected: Vec<_> = plan.selected.keys().cloned().collect();
     if let Some(completion) = &results.completion {
         let admitted = verified_execution::admit_collected(
@@ -130,8 +164,14 @@ fn execution_inner(
         if result.error.is_some() || result.status != "passed" {
             return Err("E_WORKFLOW_EVIDENCE: failed operation".into());
         }
-        chrono_judge_routes::compare(plan, op, result.receipt.as_ref())?;
-        process(&result.receipt.as_ref().unwrap().process)?;
+        if let Some(error) = &checks.operations[&op.method.operation] {
+            return Err(error.clone());
+        }
+        let receipt = result
+            .receipt
+            .as_ref()
+            .ok_or("E_ROUTE_MISSING: missing execution receipt")?;
+        process(&receipt.process)?;
     }
     Ok(())
 }
@@ -210,16 +250,24 @@ pub fn binding(
         {
             return Err("E_WORKFLOW_EVIDENCE: contribution identity".into());
         }
-        contribution(plan, evidence)?;
+        execution_inner(req, r, plan, evidence, true)?;
     } else {
-        execution(plan, evidence)?;
+        execution(req, r, plan, evidence)?;
         if results.completion.is_some() {
             projects::check_collection(req, r, effective, plan, evidence, None)?;
         }
     }
-    if plan.binding != chrono_judge_routes::binding(req, effective)
-        || plan.root != req.candidate.root
-    {
+    let methods = chrono_judge_registration::execution::methods(r.projects());
+    let mut templates = BTreeMap::new();
+    if let Ok(methods) = &methods {
+        for op in &plan.operations {
+            if let Some([definition]) = methods.get(&op.method.operation).map(Vec::as_slice) {
+                templates.insert(op.method.operation.as_str(), &definition.argv);
+            }
+        }
+    }
+    let context = routes::context(req, r, req, effective, &templates)?;
+    if plan.binding != context.binding || plan.root != req.candidate.root {
         return Err("E_WORKFLOW_EVIDENCE: current plan binding".into());
     }
     let mut executables = BTreeMap::new();
@@ -289,7 +337,7 @@ pub fn binding(
         format!("judge:{}", req.judge_id),
         json!({"path":relative(&req.candidate.root,&myself),"sha256":sha256(&bytes)}),
     );
-    let methods = chrono_judge_registration::execution::methods(r.projects())?;
+    let methods = methods?;
     let mut contract = vec![];
     for op in &plan.operations {
         let d = methods
@@ -297,7 +345,7 @@ pub fn binding(
             .filter(|v| v.len() == 1)
             .ok_or("E_WORKFLOW_EVIDENCE: method declaration")?;
         if op.method.tool != d[0].tool
-            || op.method.argv != chrono_judge_routes::expand(&d[0].argv, &plan.binding)
+            || context.expanded.get(&op.method.operation) != Some(&op.method.argv)
         {
             return Err("E_WORKFLOW_EVIDENCE: changed method".into());
         }
