@@ -1,7 +1,7 @@
 //! Public route evidence used by workflow. The installed routes judge verifies the plan and receipts.
 use crate::query;
 use crate::registration::Registry;
-use chrono_harness::{observation::Tool, wire::Request};
+use crate::wire::{Request, Tool};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
@@ -81,5 +81,5 @@ pub fn collection(
     let input = json!({"root":original.root,"binding":original.binding,"selected":current.selected.keys().collect::<Vec<_>>(),
         "filemap":registry.filemap,"projects":registry.projects,"test_operations":registry.test_operations,"environment":current.environment});
     let output = query::invoke(req, registry, "routes", "collection-plan-v1", &input)?;
-    chrono_harness::decode(&output)
+    req.decode(&output)
 }

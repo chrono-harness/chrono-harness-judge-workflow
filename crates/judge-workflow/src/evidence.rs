@@ -3,10 +3,7 @@ use crate::registration::Registry;
 use crate::routes::{self, Execution};
 use crate::verified_evidence;
 use crate::verified_execution;
-use chrono_harness::{
-    ProcessResult, sha256,
-    wire::{self, Request, Response, Status},
-};
+use crate::wire::{self, Process as ProcessResult, Request, Response, Scope, Status, sha256};
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -27,18 +24,26 @@ pub fn output<'a>(req: &'a Request, key: &str) -> Result<&'a Value, String> {
     }
     Ok(values[0])
 }
-pub fn process(p: &ProcessResult) -> Result<(), String> {
-    chrono_harness::observation::process_success(p)
+pub fn process(req: &Request, p: &ProcessResult) -> Result<(), String> {
+    req.evidence(json!({"operation":"check-process","process":p}))
 }
-pub fn record(v: &Value) -> Result<(Response, ProcessResult), String> {
-    let expanded = chrono_harness::full::expand_record(v)?;
-    let v = &expanded;
+pub fn record(req: &Request, v: &Value) -> Result<(Response, ProcessResult), String> {
+    #[derive(serde::Deserialize)]
+    struct Observed {
+        record: Value,
+        stdout_matches: bool,
+    }
+    let observed: Observed = req
+        .evidence(json!({"operation":"observe-record","record":v}))
+        .map_err(|error| match error.strip_prefix("E_RECORD_SHAPE: ") {
+            Some(cause) => format!("E_WORKFLOW_EVIDENCE: {cause}"),
+            None => error,
+        })?;
+    let v = &observed.record;
     let r: Response = serde_json::from_value(v["response"].clone())
         .map_err(|e| format!("E_WORKFLOW_EVIDENCE: {e}"))?;
     let p: ProcessResult = serde_json::from_value(v["process"].clone())
         .map_err(|e| format!("E_WORKFLOW_EVIDENCE: {e}"))?;
-    process(&p)?;
-    let response = chrono_harness::decode::<Value>(&p.stdout_bytes)?;
     let admitted = verified_evidence::admit_record(
         v["state"] == "executed",
         v["id"] == r.judge_id,
@@ -46,7 +51,7 @@ pub fn record(v: &Value) -> Result<(Response, ProcessResult), String> {
         v["request_digest"] == p.stdin_sha256,
         v["exit_code"] == 0,
         r.status < Status::Fail,
-        response == v["response"],
+        observed.stdout_matches,
     );
     if !admitted {
         return Err("E_WORKFLOW_EVIDENCE: response/process identity".into());
@@ -171,7 +176,7 @@ fn execution_inner(
             .receipt
             .as_ref()
             .ok_or("E_ROUTE_MISSING: missing execution receipt")?;
-        process(&receipt.process)?;
+        process(req, &receipt.process)?;
     }
     Ok(())
 }
@@ -180,10 +185,10 @@ pub fn relative(root: &Path, path: &Path) -> String {
         .map(|p| format!("host:{}", p.display()))
         .unwrap_or_else(|_| format!("external:{}", path.display()))
 }
-fn tools(plan: &Execution) -> Result<Value, String> {
+fn tools(req: &Request, plan: &Execution) -> Result<Value, String> {
     let mut out = BTreeMap::new();
     for (id, t) in &plan.tools {
-        process(&t.version)?;
+        process(req, &t.version)?;
         if t.version.sha256 != t.sha256
             || t.version.executable != t.path
             || t.version.cwd != plan.root
@@ -245,7 +250,7 @@ pub fn binding(
     effective: &Value,
 ) -> Result<Value, String> {
     let results = &evidence.results;
-    if let Some(chrono_harness::units::Scope::Unit { unit }) = &req.scope {
+    if let Some(Scope::Unit { unit }) = &req.scope {
         if results.scope.as_deref() != Some(&format!("unit:{unit}")) || results.completion.is_some()
         {
             return Err("E_WORKFLOW_EVIDENCE: contribution identity".into());
@@ -278,7 +283,7 @@ pub fn binding(
     let configured = r.judges["judges"].as_array().unwrap();
     let mut seen = BTreeSet::new();
     for v in records {
-        let (response, p) = record(v)?;
+        let (response, p) = record(req, v)?;
         let id = &response.judge_id;
         let defs: Vec<_> = configured.iter().filter(|j| j["id"] == *id).collect();
         if defs.len() != 1
@@ -352,6 +357,6 @@ pub fn binding(
         contract.push(json!({"method":d[0],"predecessors":op.predecessors,"timeout_seconds":op.timeout_seconds,"output_limit_bytes":op.output_limit_bytes}));
     }
     Ok(
-        json!({"base":req.base.commit,"candidate_tree":req.candidate.tree,"registry_digest":req.registries.digest,"executables":executables,"tools":if let Some(c)=&results.completion {c.tools.clone()} else {tools(plan)?},"environment":plan.environment,"effective_inputs":inputs(effective,&req.base.commit,&req.candidate.commit,&req.candidate.tree,&req.candidate.root)?,"required_tests":{"obligations":impact["required_tests"],"selected":plan.selected,"methods":contract}}),
+        json!({"base":req.base.commit,"candidate_tree":req.candidate.tree,"registry_digest":req.registries.digest,"executables":executables,"tools":if let Some(c)=&results.completion {c.tools.clone()} else {tools(req, plan)?},"environment":plan.environment,"effective_inputs":inputs(effective,&req.base.commit,&req.candidate.commit,&req.candidate.tree,&req.candidate.root)?,"required_tests":{"obligations":impact["required_tests"],"selected":plan.selected,"methods":contract}}),
     )
 }

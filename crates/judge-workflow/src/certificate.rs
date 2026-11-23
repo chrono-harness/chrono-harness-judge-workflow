@@ -1,11 +1,8 @@
 use crate::projects::{self, ProjectEvidence};
 use crate::registration::Registry;
 use crate::routes::{self, Execution};
+use crate::wire::{self, Request, sha256};
 use crate::{evidence, verified_certificate};
-use chrono_harness::{
-    json, no_symlink_parents, sha256,
-    wire::{self, Request},
-};
 use serde_json::{Value, json as value};
 use std::{collections::BTreeSet, fs, path::Path};
 const FIELDS: [&str; 9] = [
@@ -26,7 +23,7 @@ fn location(req: &Request, r: &Registry) -> Result<std::path::PathBuf, String> {
     if !path.starts_with(".chrono-harness/state/") {
         return Err("E_INTEGRATION_BINDING: evidence must be in state".into());
     }
-    no_symlink_parents(&req.candidate.root, path)
+    req.artifact(value!({"operation":"checked-path","path":path}))
 }
 pub fn validate_bind(r: &Registry) -> Result<(), String> {
     let keys = r.workflow["integration"]["bind"].as_array().unwrap();
@@ -98,32 +95,29 @@ fn report_output<'a>(report: &'a Value, key: &str) -> Result<&'a Value, String> 
 }
 pub fn consume(
     queries: &mut crate::registration::QueryFacts,
-    reader: &chrono_harness::facts::Reader,
+    reader: &crate::facts::Reader,
     req: &Request,
     r: &Registry,
     ctx: &Value,
     binding: &Value,
     observation: Option<&Value>,
 ) -> Result<Value, String> {
-    let _read_scope =
-        chrono_harness::retained_artifacts::retention::read_scope(&req.candidate.root)?;
     let digest = ctx["integration_evidence"]
         .as_str()
         .ok_or("E_INTEGRATION_REQUIRED: no evidence digest")?;
     let path = location(req, r)?;
-    let _certificate = chrono_harness::retained_artifacts::retention::read_guard(
-        &req.candidate.root,
-        path.strip_prefix(&req.candidate.root)
-            .map_err(|e| e.to_string())?
-            .to_str()
-            .ok_or("certificate path UTF8")?,
-    )?;
+    let relative = path
+        .strip_prefix(&req.candidate.root)
+        .map_err(|e| e.to_string())?
+        .to_str()
+        .ok_or("certificate path UTF8")?;
+    req.artifact::<()>(value!({"operation":"retain-read","path":relative}))?;
     let bytes = fs::read(path).map_err(|e| format!("E_INTEGRATION_REQUIRED: {e}"))?;
     let mut check = || -> Result<Value, String> {
         if sha256(&bytes) != digest {
             return Err("certificate byte digest differs".into());
         }
-        let c = json(&bytes)?;
+        let c: Value = req.decode(&bytes)?;
         if c["schema_version"] != 1 || c["status"] != "passed" {
             return Err("certificate did not succeed".into());
         }
@@ -137,7 +131,7 @@ pub fn consume(
         let candidate = producer["candidate"]
             .as_str()
             .ok_or("missing producer candidate")?;
-        if reader.verify_oid(&req.candidate.root, candidate)? != req.candidate.tree {
+        if reader.verify_oid(candidate)? != req.candidate.tree {
             return Err("producer candidate tree differs".into());
         }
         let old_ctx = &proof["context"];
@@ -171,7 +165,7 @@ pub fn consume(
         }
         let mut now = old_ctx.clone();
         now["observed_at"] = ctx["observed_at"].clone();
-        if crate::branch::with_reader(reader, &req.candidate.root, candidate, &now, &r.workflow)?["kind"]
+        if crate::branch::with_reader(reader, candidate, &now, &r.workflow)?["kind"]
             != "integration"
         {
             return Err("producer is not integration".into());
@@ -206,14 +200,9 @@ pub fn consume(
             .as_str()
             .filter(|p| p.starts_with(".chrono-harness/state/"))
             .ok_or("retained report path")?;
-        let physical = chrono_harness::prepared::original_path(
-            &chrono_harness::prepared::Original {
-                path: report_path.into(),
-                sha256: String::new(),
-            },
-            None,
-        )?;
-        let report_file = no_symlink_parents(&req.candidate.root, &physical)?;
+        let physical:String=req.artifact(value!({"operation":"resolve-original","original":{"path":report_path,"sha256":""},"transport":null}))?;
+        let report_file: std::path::PathBuf =
+            req.artifact(value!({"operation":"checked-path","path":physical}))?;
         if results.results.completion.is_some()
             && fs::metadata(&report_file).map_err(|e| e.to_string())?.len()
                 > r.config["execution_units"]["collection_limits"]["report_bytes"]
@@ -222,15 +211,12 @@ pub fn consume(
         {
             return Err("collected producer report exceeds registered bound".into());
         }
-        let _retention = chrono_harness::retained_artifacts::retention::read_guard(
-            &req.candidate.root,
-            &physical,
-        )?;
+        req.artifact::<()>(value!({"operation":"retain-read","path":physical}))?;
         let report_bytes = fs::read(&report_file)
             .map_err(|e| format!("producer report absent/not finalized: {e}"))?;
-        let report = json(&report_bytes)?;
+        let report: Value = req.decode(&report_bytes)?;
         if results.results.completion.is_some()
-            && chrono_harness::full::report_transport_bytes(&report, report_bytes.len() as u64)?
+            && req.evidence::<u64>(value!({"operation":"report-transport-bytes","report":report,"metadata_bytes":report_bytes.len()}))?
                 > r.config["execution_units"]["collection_limits"]["report_bytes"]
                     .as_u64()
                     .ok_or("collected producer report bound")?
@@ -259,26 +245,27 @@ pub fn consume(
             .as_array()
             .ok_or("producer judges")?
             .iter()
-            .map(chrono_harness::full::expand_record)
+            .map(|record| {
+                req.evidence::<Value>(value!({"operation":"expand-record","record":record}))
+            })
             .collect::<Result<Vec<_>, _>>()?;
         let records = &expanded;
         if results.results.completion.is_some() {
             let original: Request =
                 serde_json::from_value(report["request"].clone()).map_err(|e| e.to_string())?;
-            original.validate()?;
+            req.evidence::<()>(value!({"operation":"validate-request","request":original}))?;
             if original.candidate.root != plan.root
                 || original.context.sha256 != producer["context_digest"]
             {
                 return Err("collected producer request differs".into());
             }
-            let bindings: Vec<wire::Binding> =
-                serde_json::from_value(r.judges["judges"].clone()).map_err(|e| e.to_string())?;
-            let parsed = chrono_harness::full::retained_judges(&original, &bindings, records)?;
-            let aggregate = parsed
-                .values()
-                .fold(wire::Status::Pass, |status, (_, _, response, _)| {
-                    status.maximum(response.status.clone())
-                });
+            let parsed: Value = req.evidence(value!({
+                "operation": "retained-judges",
+                "request": original,
+                "bindings": r.judges["judges"],
+                "records": report["judges"],
+                "judge": producer["judge"]
+            }))?;
             let findings: Vec<Value> = records
                 .iter()
                 .flat_map(|row| {
@@ -289,22 +276,18 @@ pub fn consume(
                         .cloned()
                 })
                 .collect();
-            if report["status"] != serde_json::to_value(aggregate).map_err(|e| e.to_string())?
-                || report["findings"] != value!(findings)
-            {
+            if report["status"] != parsed["status"] || report["findings"] != value!(findings) {
                 return Err("collected producer summary differs from actual judges".into());
             }
-            let original = &parsed
-                .get(producer["judge"].as_str().ok_or("producer judge")?)
-                .ok_or("producer workflow input")?
-                .0;
+            let original: Request =
+                serde_json::from_value(parsed["request"].clone()).map_err(|e| e.to_string())?;
             if original.request_id != producer["request_id"]
                 || original.impact != req.impact
                 || plan.binding
                     != routes::context(
                         req,
                         r,
-                        original,
+                        &original,
                         &proof["effective_inputs"],
                         &Default::default(),
                     )?
@@ -335,7 +318,8 @@ pub fn consume(
             return Err("producer judge set differs".into());
         }
         for old in observations {
-            let expanded = chrono_harness::full::expand_record(old)?;
+            let expanded: Value =
+                req.evidence(value!({"operation":"expand-record","record":old}))?;
             let old = &expanded;
             let matches: Vec<_> = records.iter().filter(|v| v["id"] == old["id"]).collect();
             if matches.len() != 1 {
@@ -356,7 +340,7 @@ pub fn consume(
             value!({"path":evidence::relative(&plan.root,Path::new(rp)),"sha256":runner["sha256"]}),
         );
         for row in records {
-            let (response, p) = evidence::record(row)?;
+            let (response, p) = evidence::record(req, row)?;
             if !seen.insert(response.judge_id.clone()) {
                 return Err("duplicate observed judge".into());
             }
