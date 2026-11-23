@@ -1,10 +1,10 @@
+use crate::projects::{self, ProjectEvidence};
 use crate::verified_evidence;
 use crate::verified_execution;
 use chrono_harness::{
     ProcessResult, sha256,
     wire::{self, Request, Response, Status},
 };
-use chrono_judge_projects::Results;
 use chrono_judge_registration::Registrations;
 use chrono_judge_routes::Execution;
 use serde_json::{Value, json};
@@ -53,13 +53,18 @@ pub fn record(v: &Value) -> Result<(Response, ProcessResult), String> {
     }
     Ok((r, p))
 }
-pub fn execution(plan: &Execution, results: &Results) -> Result<(), String> {
-    execution_inner(plan, results, false)
+pub fn execution(plan: &Execution, evidence: &ProjectEvidence) -> Result<(), String> {
+    execution_inner(plan, evidence, false)
 }
-pub fn contribution(plan: &Execution, results: &Results) -> Result<(), String> {
-    execution_inner(plan, results, true)
+pub fn contribution(plan: &Execution, evidence: &ProjectEvidence) -> Result<(), String> {
+    execution_inner(plan, evidence, true)
 }
-fn execution_inner(plan: &Execution, results: &Results, contribution: bool) -> Result<(), String> {
+fn execution_inner(
+    plan: &Execution,
+    evidence: &ProjectEvidence,
+    contribution: bool,
+) -> Result<(), String> {
+    let results = &evidence.results;
     plan.validate()?;
     let selected: Vec<_> = plan.selected.keys().cloned().collect();
     if let Some(completion) = &results.completion {
@@ -105,7 +110,7 @@ fn execution_inner(plan: &Execution, results: &Results, contribution: bool) -> R
         results.scope.is_none() || contribution,
         results.selected == selected,
         results.tests.keys().cloned().collect::<Vec<_>>() == selected,
-        results.passed(),
+        evidence.passed,
         results.executed.len() == plan.operations.len(),
     );
     if !admitted {
@@ -195,31 +200,21 @@ pub fn binding(
     req: &Request,
     r: &Registrations,
     plan: &Execution,
-    results: &Results,
+    evidence: &ProjectEvidence,
     impact: &Value,
     effective: &Value,
 ) -> Result<Value, String> {
+    let results = &evidence.results;
     if let Some(chrono_harness::units::Scope::Unit { unit }) = &req.scope {
         if results.scope.as_deref() != Some(&format!("unit:{unit}")) || results.completion.is_some()
         {
             return Err("E_WORKFLOW_EVIDENCE: contribution identity".into());
         }
-        contribution(plan, results)?;
+        contribution(plan, evidence)?;
     } else {
-        execution(plan, results)?;
+        execution(plan, evidence)?;
         if results.completion.is_some() {
-            let reader = chrono_harness::facts::Reader::for_request(req)?;
-            let (old, _, _) = chrono_judge_registration::views_with_reader(req, &reader)?;
-            chrono_judge_projects::verify_completion(
-                req,
-                r,
-                &old,
-                effective,
-                plan,
-                results,
-                None,
-                &req.candidate.root,
-            )?;
+            projects::check_collection(req, r, effective, plan, evidence, None)?;
         }
     }
     if plan.binding != chrono_judge_routes::binding(req, effective)

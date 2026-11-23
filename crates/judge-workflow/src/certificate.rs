@@ -1,9 +1,9 @@
+use crate::projects::{self, ProjectEvidence};
 use crate::{evidence, verified_certificate};
 use chrono_harness::{
     json, no_symlink_parents, sha256,
     wire::{self, Request},
 };
-use chrono_judge_projects::Results;
 use chrono_judge_registration::Registrations;
 use chrono_judge_routes::Execution;
 use serde_json::{Value, json as value};
@@ -49,7 +49,7 @@ pub fn produce(
     ctx: &Value,
     mut binding: Value,
     plan: &Execution,
-    results: &Results,
+    results: &ProjectEvidence,
     effective: &Value,
 ) -> Result<Value, String> {
     let report = req.observations["report_path"]
@@ -58,7 +58,7 @@ pub fn produce(
         .ok_or("E_WORKFLOW_EVIDENCE: retained runner report path missing")?;
     binding["schema_version"] = 1.into();
     binding["status"] = "passed".into();
-    binding["results_digest"] = wire::digest(results)?.into();
+    binding["results_digest"] = wire::digest(&results.wire)?.into();
     for k in [
         "branch_ref",
         "fork_point",
@@ -73,7 +73,7 @@ pub fn produce(
     {
         binding["producer"]["artifact_directory"] = value!(directory);
     }
-    binding["proof"] = value!({"context":ctx,"plan":plan,"results":results,"effective_inputs":effective,"judges":req.observations["judges"]});
+    binding["proof"] = value!({"context":ctx,"plan":plan,"results":results.wire,"effective_inputs":effective,"judges":req.observations["judges"]});
     let path = location(req, r)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -180,10 +180,9 @@ pub fn consume(
         }
         let plan: Execution =
             serde_json::from_value(proof["plan"].clone()).map_err(|e| e.to_string())?;
-        let results: Results =
-            serde_json::from_value(proof["results"].clone()).map_err(|e| e.to_string())?;
+        let results = projects::read(req, r, &proof["results"])?;
         evidence::execution(&plan, &results)?;
-        if c["results_digest"] != wire::digest(&results)?
+        if c["results_digest"] != wire::digest(&results.wire)?
             || plan.root != Path::new(producer["root"].as_str().ok_or("producer root")?)
             || plan.binding["candidate"] != candidate
             || plan.binding["base"] != req.base.commit
@@ -214,7 +213,7 @@ pub fn consume(
             None,
         )?;
         let report_file = no_symlink_parents(&req.candidate.root, &physical)?;
-        if results.completion.is_some()
+        if results.results.completion.is_some()
             && fs::metadata(&report_file).map_err(|e| e.to_string())?.len()
                 > r.config()["execution_units"]["collection_limits"]["report_bytes"]
                     .as_u64()
@@ -229,7 +228,7 @@ pub fn consume(
         let report_bytes = fs::read(&report_file)
             .map_err(|e| format!("producer report absent/not finalized: {e}"))?;
         let report = json(&report_bytes)?;
-        if results.completion.is_some()
+        if results.results.completion.is_some()
             && chrono_harness::full::report_transport_bytes(&report, report_bytes.len() as u64)?
                 > r.config()["execution_units"]["collection_limits"]["report_bytes"]
                     .as_u64()
@@ -262,7 +261,7 @@ pub fn consume(
             .map(chrono_harness::full::expand_record)
             .collect::<Result<Vec<_>, _>>()?;
         let records = &expanded;
-        if results.completion.is_some() {
+        if results.results.completion.is_some() {
             let original: Request =
                 serde_json::from_value(report["request"].clone()).map_err(|e| e.to_string())?;
             original.validate()?;
@@ -320,30 +319,15 @@ pub fn consume(
             if serde_json::to_value(&expected).map_err(|e| e.to_string())? != proof["plan"] {
                 return Err("collected global declaration plan differs".into());
             }
-            let (old, _, _) = chrono_judge_registration::views_with_reader(req, reader)?;
-            if chrono_judge_projects::validate_retained_request_at(
-                original,
-                &old,
+            // Retain the workflow reader's observations for the fixed registration endpoints.
+            chrono_judge_registration::views_with_reader(req, reader)?;
+            projects::check_collection(
+                req,
                 r,
-                &report["artifacts"],
-                &req.candidate.root,
-                None,
-            )? != proof["effective_inputs"]
-            {
-                return Err("collected producer retained inputs differ".into());
-            }
-            chrono_judge_projects::verify_completion(
-                original,
-                r,
-                &old,
                 &proof["effective_inputs"],
                 &plan,
                 &results,
-                Some(&chrono_harness::retained_artifacts::transport_map(
-                    &report["artifacts"],
-                    None,
-                )?),
-                &req.candidate.root,
+                Some(value!({"request":original,"artifacts":report["artifacts"]})),
             )?;
         }
         let observations = proof["judges"].as_array().ok_or("producer observations")?;

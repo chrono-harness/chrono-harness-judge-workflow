@@ -2,6 +2,7 @@
 mod branch;
 mod certificate;
 mod evidence;
+mod projects;
 mod transition;
 mod verified_branch;
 mod verified_certificate;
@@ -13,7 +14,6 @@ use chrono_harness::{
     facts, json,
     wire::{self, Finding, Request, Response, Status},
 };
-use chrono_judge_projects::Results;
 use chrono_judge_routes::Execution;
 use serde_json::{Value, json as value};
 
@@ -95,8 +95,7 @@ fn evaluate(req: &Request, reader: &facts::Reader) -> Result<Value, String> {
         .ok_or("E_WORKFLOW_INPUT: integration selection")?;
     let plan: Execution = serde_json::from_value(evidence::output(req, "execution_plan")?.clone())
         .map_err(|e| e.to_string())?;
-    let results: Results = serde_json::from_value(evidence::output(req, "tests")?.clone())
-        .map_err(|e| e.to_string())?;
+    let results = projects::read(req, &b, evidence::output(req, "tests")?)?;
     let effective = chrono_judge_registration::inputs::validate(req, &a, &b)?;
     let binding = evidence::binding(req, &b, &plan, &results, impact, &effective)?;
     if let Some(chrono_harness::units::Scope::Unit { unit }) = &req.scope {
@@ -133,7 +132,7 @@ fn evaluate(req: &Request, reader: &facts::Reader) -> Result<Value, String> {
         &a,
         &b,
         impact,
-        &results,
+        &results.results,
         &view,
         evidence::output(req, "costs")?,
     )?;

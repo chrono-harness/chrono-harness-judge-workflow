@@ -1,5 +1,5 @@
+use crate::projects::Results;
 use chrono_harness::{facts, wire::Request};
-use chrono_judge_projects::Results;
 use chrono_judge_registration::{Registrations, retirement_declaration as declaration};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
