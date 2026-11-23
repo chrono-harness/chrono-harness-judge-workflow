@@ -1,11 +1,11 @@
 use crate::projects::{self, ProjectEvidence};
+use crate::registration::Registry;
 use crate::routes::{self, Execution};
 use crate::{evidence, verified_certificate};
 use chrono_harness::{
     json, no_symlink_parents, sha256,
     wire::{self, Request},
 };
-use chrono_judge_registration::Registrations;
 use serde_json::{Value, json as value};
 use std::{collections::BTreeSet, fs, path::Path};
 const FIELDS: [&str; 9] = [
@@ -19,8 +19,8 @@ const FIELDS: [&str; 9] = [
     "required_tests",
     "results_digest",
 ];
-fn location(req: &Request, r: &Registrations) -> Result<std::path::PathBuf, String> {
-    let path = r.workflow()["integration"]["evidence"]
+fn location(req: &Request, r: &Registry) -> Result<std::path::PathBuf, String> {
+    let path = r.workflow["integration"]["evidence"]
         .as_str()
         .ok_or("E_INTEGRATION_BINDING: evidence path")?;
     if !path.starts_with(".chrono-harness/state/") {
@@ -28,8 +28,8 @@ fn location(req: &Request, r: &Registrations) -> Result<std::path::PathBuf, Stri
     }
     no_symlink_parents(&req.candidate.root, path)
 }
-pub fn validate_bind(r: &Registrations) -> Result<(), String> {
-    let keys = r.workflow()["integration"]["bind"].as_array().unwrap();
+pub fn validate_bind(r: &Registry) -> Result<(), String> {
+    let keys = r.workflow["integration"]["bind"].as_array().unwrap();
     let supplied: BTreeSet<_> = keys.iter().filter_map(Value::as_str).collect();
     let admitted = verified_certificate::admit_binding(
         keys.len() == FIELDS.len(),
@@ -45,7 +45,7 @@ pub fn validate_bind(r: &Registrations) -> Result<(), String> {
 }
 pub fn produce(
     req: &Request,
-    r: &Registrations,
+    r: &Registry,
     ctx: &Value,
     mut binding: Value,
     plan: &Execution,
@@ -81,7 +81,7 @@ pub fn produce(
     let bytes = wire::canonical(&binding)?;
     fs::write(path, &bytes).map_err(|e| e.to_string())?;
     Ok(
-        value!({"sha256":sha256(&bytes),"path":r.workflow()["integration"]["evidence"],"producer_report":report,"validation_scope":"declared inputs; complete runtime closure remains a separate obligation"}),
+        value!({"sha256":sha256(&bytes),"path":r.workflow["integration"]["evidence"],"producer_report":report,"validation_scope":"declared inputs; complete runtime closure remains a separate obligation"}),
     )
 }
 fn report_output<'a>(report: &'a Value, key: &str) -> Result<&'a Value, String> {
@@ -97,9 +97,10 @@ fn report_output<'a>(report: &'a Value, key: &str) -> Result<&'a Value, String> 
     Ok(values[0])
 }
 pub fn consume(
+    queries: &mut crate::registration::QueryFacts,
     reader: &chrono_harness::facts::Reader,
     req: &Request,
-    r: &Registrations,
+    r: &Registry,
     ctx: &Value,
     binding: &Value,
     observation: Option<&Value>,
@@ -118,7 +119,7 @@ pub fn consume(
             .ok_or("certificate path UTF8")?,
     )?;
     let bytes = fs::read(path).map_err(|e| format!("E_INTEGRATION_REQUIRED: {e}"))?;
-    let check = || -> Result<Value, String> {
+    let mut check = || -> Result<Value, String> {
         if sha256(&bytes) != digest {
             return Err("certificate byte digest differs".into());
         }
@@ -170,13 +171,13 @@ pub fn consume(
         }
         let mut now = old_ctx.clone();
         now["observed_at"] = ctx["observed_at"].clone();
-        if crate::branch::with_reader(reader, &req.candidate.root, candidate, &now, r.workflow())?["kind"]
+        if crate::branch::with_reader(reader, &req.candidate.root, candidate, &now, &r.workflow)?["kind"]
             != "integration"
         {
             return Err("producer is not integration".into());
         }
         if let Some(observation) = observation {
-            crate::branch::current_observation_age(old_ctx, r.workflow(), observation)?;
+            crate::branch::current_observation_age(old_ctx, &r.workflow, observation)?;
         }
         let plan: Execution =
             serde_json::from_value(proof["plan"].clone()).map_err(|e| e.to_string())?;
@@ -215,7 +216,7 @@ pub fn consume(
         let report_file = no_symlink_parents(&req.candidate.root, &physical)?;
         if results.results.completion.is_some()
             && fs::metadata(&report_file).map_err(|e| e.to_string())?.len()
-                > r.config()["execution_units"]["collection_limits"]["report_bytes"]
+                > r.config["execution_units"]["collection_limits"]["report_bytes"]
                     .as_u64()
                     .ok_or("collected producer report bound")?
         {
@@ -230,7 +231,7 @@ pub fn consume(
         let report = json(&report_bytes)?;
         if results.results.completion.is_some()
             && chrono_harness::full::report_transport_bytes(&report, report_bytes.len() as u64)?
-                > r.config()["execution_units"]["collection_limits"]["report_bytes"]
+                > r.config["execution_units"]["collection_limits"]["report_bytes"]
                     .as_u64()
                     .ok_or("collected producer report bound")?
         {
@@ -271,7 +272,7 @@ pub fn consume(
                 return Err("collected producer request differs".into());
             }
             let bindings: Vec<wire::Binding> =
-                serde_json::from_value(r.judges()["judges"].clone()).map_err(|e| e.to_string())?;
+                serde_json::from_value(r.judges["judges"].clone()).map_err(|e| e.to_string())?;
             let parsed = chrono_harness::full::retained_judges(&original, &bindings, records)?;
             let aggregate = parsed
                 .values()
@@ -319,7 +320,7 @@ pub fn consume(
                 return Err("collected global declaration plan differs".into());
             }
             // Retain the workflow reader's observations for the fixed registration endpoints.
-            chrono_judge_registration::views_with_reader(req, reader)?;
+            queries.read(req, reader, true)?;
             projects::check_collection(
                 req,
                 r,

@@ -1,10 +1,7 @@
 //! Public route evidence used by workflow. The installed routes judge verifies the plan and receipts.
 use crate::query;
+use crate::registration::Registry;
 use chrono_harness::{observation::Tool, wire::Request};
-use chrono_judge_registration::{
-    Registrations,
-    execution::{Method, Plan, Scheduling},
-};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
@@ -20,11 +17,21 @@ pub struct Execution {
     pub binding: Value,
     pub root: PathBuf,
     pub environment: BTreeMap<String, String>,
-    pub selected: BTreeMap<String, Plan>,
+    pub selected: BTreeMap<String, Value>,
     pub operations: Vec<Operation>,
     pub tools: BTreeMap<String, Tool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    scheduling: Option<Scheduling>,
+    scheduling: Option<Value>,
+}
+
+// Route queries validate the complete plan. Workflow reads only the method fields used in its binding.
+#[derive(Serialize, Deserialize)]
+pub struct Method {
+    pub operation: String,
+    pub tool: String,
+    pub argv: Vec<String>,
+    #[serde(flatten)]
+    rest: BTreeMap<String, Value>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -45,7 +52,7 @@ pub struct Context {
 
 pub fn context(
     caller: &Request,
-    registry: &Registrations,
+    registry: &Registry,
     original: &Request,
     effective: &Value,
     templates: &BTreeMap<&str, &Vec<String>>,
@@ -67,25 +74,12 @@ pub fn context(
 
 pub fn collection(
     req: &Request,
-    registry: &Registrations,
+    registry: &Registry,
     original: &Execution,
     current: &Execution,
 ) -> Result<Value, String> {
-    let test_operations: BTreeMap<_, Vec<_>> = registry
-        .test_bindings()
-        .into_iter()
-        .map(|(id, bindings)| {
-            (
-                id,
-                bindings
-                    .into_iter()
-                    .map(|binding| binding.operation)
-                    .collect(),
-            )
-        })
-        .collect();
     let input = json!({"root":original.root,"binding":original.binding,"selected":current.selected.keys().collect::<Vec<_>>(),
-        "filemap":registry.filemap(),"projects":registry.projects(),"test_operations":test_operations,"environment":current.environment});
+        "filemap":registry.filemap,"projects":registry.projects,"test_operations":registry.test_operations,"environment":current.environment});
     let output = query::invoke(req, registry, "routes", "collection-plan-v1", &input)?;
     chrono_harness::decode(&output)
 }

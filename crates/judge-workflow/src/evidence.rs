@@ -1,4 +1,5 @@
 use crate::projects::{self, ProjectEvidence};
+use crate::registration::Registry;
 use crate::routes::{self, Execution};
 use crate::verified_evidence;
 use crate::verified_execution;
@@ -6,7 +7,6 @@ use chrono_harness::{
     ProcessResult, sha256,
     wire::{self, Request, Response, Status},
 };
-use chrono_judge_registration::Registrations;
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -55,7 +55,7 @@ pub fn record(v: &Value) -> Result<(Response, ProcessResult), String> {
 }
 pub fn execution(
     req: &Request,
-    registry: &Registrations,
+    registry: &Registry,
     plan: &Execution,
     evidence: &ProjectEvidence,
 ) -> Result<(), String> {
@@ -63,7 +63,7 @@ pub fn execution(
 }
 fn execution_inner(
     req: &Request,
-    registry: &Registrations,
+    registry: &Registry,
     plan: &Execution,
     evidence: &ProjectEvidence,
     contribution: bool,
@@ -238,7 +238,7 @@ pub fn inputs(
 }
 pub fn binding(
     req: &Request,
-    r: &Registrations,
+    r: &Registry,
     plan: &Execution,
     evidence: &ProjectEvidence,
     impact: &Value,
@@ -257,7 +257,7 @@ pub fn binding(
             projects::check_collection(req, r, effective, plan, evidence, None)?;
         }
     }
-    let methods = chrono_judge_registration::execution::methods(r.projects());
+    let methods = r.methods.as_ref().map_err(Clone::clone);
     let mut templates = BTreeMap::new();
     if let Ok(methods) = &methods {
         for op in &plan.operations {
@@ -275,7 +275,7 @@ pub fn binding(
     let records = req.observations["judges"]
         .as_array()
         .ok_or("E_WORKFLOW_EVIDENCE: missing actual judge observations")?;
-    let configured = r.judges()["judges"].as_array().unwrap();
+    let configured = r.judges["judges"].as_array().unwrap();
     let mut seen = BTreeSet::new();
     for v in records {
         let (response, p) = record(v)?;
