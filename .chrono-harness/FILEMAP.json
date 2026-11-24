@@ -1,0 +1,865 @@
+{
+  "schema_version": 2,
+  "status": "proposed",
+  "files": [
+    {
+      "path": ".chrono-harness/.gitignore",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/FILEMAP.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
+    },
+    {
+      "path": ".chrono-harness/USAGE.md",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/ci/check.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
+    },
+    {
+      "path": ".chrono-harness/ci/install.sh",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": ".chrono-harness/ci/units.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
+    },
+    {
+      "path": ".chrono-harness/config.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
+    },
+    {
+      "path": ".chrono-harness/judges.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
+    },
+    {
+      "path": ".chrono-harness/pr.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/projects.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
+    },
+    {
+      "path": ".chrono-harness/rules.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/template-answers.yml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/workflow.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
+    },
+    {
+      "path": ".chrono-harness/worktree.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
+    },
+    {
+      "path": ".config/mise/conf.d/chrono-harness.toml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug.yml",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/documentation.yml",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/enhancement.yml",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/question.yml",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".github/PULL_REQUEST_TEMPLATE.md",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".github/workflows/check.yml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".gitignore",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": "AGENTS.md",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": [],
+      "symlink": "CLAUDE.md"
+    },
+    {
+      "path": "CLAUDE.md",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": "README.md",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": "check.sh",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow-tests/Cargo.lock",
+      "owner": "judge-workflow-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow-tests/Cargo.toml",
+      "owner": "judge-workflow-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow-tests/tests/installed_judge.rs",
+      "owner": "judge-workflow-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow-tests/tests/observation_age.rs",
+      "owner": "judge-workflow-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow-tests/tests/proof_support/judge-workflow/full_short.rs",
+      "owner": "judge-workflow-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_execution.rs",
+            "operation": "verify.judge-workflow-execution-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/judge-workflow-tests/tests/verified_branch.rs",
+      "owner": "judge-workflow-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_branch.rs",
+            "operation": "verify.judge-workflow-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/judge-workflow-tests/tests/verified_certificate.rs",
+      "owner": "judge-workflow-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_certificate.rs",
+            "operation": "verify.judge-workflow-certificate-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/judge-workflow-tests/tests/verified_evidence.rs",
+      "owner": "judge-workflow-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/judge-workflow-tests/tests/verified_execution.rs",
+      "owner": "judge-workflow-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_execution.rs",
+            "operation": "verify.judge-workflow-execution-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/judge-workflow-tests/tests/verified_transition.rs",
+      "owner": "judge-workflow-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_transition.rs",
+            "operation": "verify.judge-workflow-transition-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/judge-workflow/Cargo.lock",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow/Cargo.toml",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow/src/branch.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow/src/certificate.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow/src/evidence.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow/src/facts.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow/src/installed_judge.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow/src/lib.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow/src/main.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow/src/projects.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow/src/query.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow/src/registration.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow/src/routes.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow/src/session.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow/src/transition.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/judge-workflow/src/verified_branch.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_branch.rs",
+            "operation": "verify.judge-workflow"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_branch.rs",
+            "operation": "verify.judge-workflow-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/judge-workflow/src/verified_certificate.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_certificate.rs",
+            "operation": "verify.judge-workflow-certificate"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_certificate.rs",
+            "operation": "verify.judge-workflow-certificate-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/judge-workflow/src/verified_evidence.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/judge-workflow/src/verified_execution.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_execution.rs",
+            "operation": "verify.judge-workflow-execution"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_execution.rs",
+            "operation": "verify.judge-workflow-execution-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/judge-workflow/src/verified_response.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_execution.rs",
+            "operation": "verify.judge-workflow-execution"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_execution.rs",
+            "operation": "verify.judge-workflow-execution-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/judge-workflow/src/verified_transition.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_transition.rs",
+            "operation": "verify.judge-workflow-transition"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_transition.rs",
+            "operation": "verify.judge-workflow-transition-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/judge-workflow/src/wire.rs",
+      "owner": "judge-workflow",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
+      "path": "docs/licenses/methodology-attribution.md",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": "docs/licenses/trureturing-Apache-2.0.txt",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    }
+  ],
+  "project_edges": [],
+  "cost_models": {
+    "unmeasured": {
+      "cpu_ms": null,
+      "wall_ms": null,
+      "peak_rss_bytes": null,
+      "io_bytes": null,
+      "basis": "unknown"
+    }
+  },
+  "test_costs": [
+    {
+      "test": "judge-workflow-tests",
+      "cost": "unmeasured"
+    }
+  ],
+  "execution_plans": {
+    "test:judge-workflow-tests": {
+      "operations": [
+        "verify.judge-workflow",
+        "verify.judge-workflow-evidence",
+        "verify.judge-workflow-execution",
+        "verify.judge-workflow-certificate",
+        "verify.judge-workflow-transition",
+        "verify.judge-workflow-tests",
+        "verify.judge-workflow-evidence-tests",
+        "verify.judge-workflow-certificate-tests",
+        "verify.judge-workflow-transition-tests",
+        "verify.judge-workflow-execution-tests",
+        "judge-workflow.owner-check"
+      ],
+      "timeout_seconds": 600,
+      "output_limit_bytes": 2097152
+    }
+  }
+}

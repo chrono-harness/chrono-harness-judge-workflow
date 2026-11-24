@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
+native_only=false
+if [[ ${1:-} == --native && $# -eq 1 ]]; then
+  native_only=true
+elif [[ $# -ne 0 ]]; then
+  echo 'usage: ./check.sh [--native]' >&2
+  exit 2
+fi
 mkdir -p target
 scratch=$(mktemp -d "$(pwd -P)/target/check.XXXXXXXX")
 trap 'rm -rf -- "$scratch"' EXIT
@@ -14,19 +21,6 @@ cargo test --locked --manifest-path crates/judge-workflow-tests/Cargo.toml
 coverage_failure() {
   echo "E_VERUS_COVERAGE: $*" >&2
   exit 1
-}
-
-prove() {
-  chrono-host-bootstrap run-compiler-proof "$scratch" "$1" "${VERUS:-verus}" "$2" ||
-    coverage_failure "$1: verifier execution failed"
-}
-
-admit_proof() {
-  local operation=$1
-  shift
-  chrono-host-bootstrap collect-compiler-proof "$scratch" "$operation" "${VERUS:-verus}" \
-    0.2026.04.24.f8e1704 f8e17045c4ac17a02e566b8997070f2eecc255be "$@" ||
-    coverage_failure "$operation: required proof execution was not admitted"
 }
 
 # Read the exact library selected by Cargo in the build of the tested executable.
@@ -44,6 +38,21 @@ chrono-host-bootstrap check-compiler-sources native "$stem" \
   src/certificate.rs src/evidence.rs src/transition.rs src/registration.rs \
   src/routes.rs src/projects.rs ||
   coverage_failure "native library differs from required sources"
+
+if "$native_only"; then exit 0; fi
+
+prove() {
+  chrono-host-bootstrap run-compiler-proof "$scratch" "$1" "${VERUS:-verus}" "$2" ||
+    coverage_failure "$1: verifier execution failed"
+}
+
+admit_proof() {
+  local operation=$1
+  shift
+  chrono-host-bootstrap collect-compiler-proof "$scratch" "$operation" "${VERUS:-verus}" \
+    0.2026.04.24.f8e1704 f8e17045c4ac17a02e566b8997070f2eecc255be "$@" ||
+    coverage_failure "$operation: required proof execution was not admitted"
+}
 
 src=crates/judge-workflow/src
 tests=crates/judge-workflow-tests/tests
