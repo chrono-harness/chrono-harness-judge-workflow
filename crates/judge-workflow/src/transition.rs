@@ -1,5 +1,6 @@
 use crate::projects::Results;
 use crate::registration::Registry;
+use crate::verified_transition::{self, RetirementError};
 use crate::{facts, wire::Request};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
@@ -32,10 +33,11 @@ pub fn evaluate(
             .get(node)
             .and_then(|v| v.as_deref())
             .unwrap_or(node);
-        if !ambiguity.repaired
-            || results.tests.get(target).map(String::as_str) != Some("passed")
-            || costs["declared_before"].get(node).is_none()
-        {
+        if !verified_transition::repair_is_complete(
+            ambiguity.repaired,
+            results.tests.get(target).map(String::as_str),
+            costs["declared_before"].get(node).is_some(),
+        ) {
             return Err(format!(
                 "E_RETIREMENT: ambiguity needs explicit repair, old costs and executed replacement: {node}"
             ));
@@ -49,26 +51,28 @@ pub fn evaluate(
             .strip_prefix("test:")
             .ok_or("invalid removed test identity")?;
         let request = replacement.as_ref().map_err(Clone::clone)?;
-        if request
-            .as_ref()
-            .is_some_and(|to| results.tests.get(to).map(String::as_str) != Some("passed"))
-        {
-            return Err(format!(
-                "E_REQUIRED_TEST_REMOVED: replacement not executed: {node}"
-            ));
-        }
-        if impact["retired_tests"]
+        let execution = request.as_ref().and_then(|to| results.tests.get(to));
+        let listed = impact["retired_tests"]
             .as_array()
-            .unwrap()
-            .contains(&json!(node))
-            && results.removed.get(node) != Some(request)
-        {
-            return Err("E_RETIREMENT: execution did not preserve removed obligation".into());
-        }
-        if costs["declared_before"].get(node).is_none() {
-            return Err(format!("E_RETIREMENT: old cost missing: {node}"));
-        }
-        decisions.push(json!({"kind":"test","id":id,"replacement":request,"status":if request.is_some(){"replaced"}else{"retired"},"executed_old_test":false}));
+            .ok_or("E_RETIREMENT: missing retired tests")?
+            .contains(&json!(node));
+        let status = verified_transition::retirement_status(
+            request.as_deref(),
+            execution.map(String::as_str),
+            listed,
+            results.removed.get(node).map(Option::as_deref),
+            costs["declared_before"].get(node).is_some(),
+        )
+        .map_err(|error| match error {
+            RetirementError::ReplacementNotExecuted => {
+                format!("E_REQUIRED_TEST_REMOVED: replacement not executed: {node}")
+            }
+            RetirementError::MissingObligation => {
+                "E_RETIREMENT: execution did not preserve removed obligation".into()
+            }
+            RetirementError::MissingOldCost => format!("E_RETIREMENT: old cost missing: {node}"),
+        })?;
+        decisions.push(json!({"kind":"test","id":id,"replacement":request,"status":status,"executed_old_test":false}));
     }
     for owner in &changes.removed_owners {
         let replacement = owner.replacement.as_ref().map_err(Clone::clone)?;

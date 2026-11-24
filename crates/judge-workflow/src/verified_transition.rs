@@ -6,7 +6,82 @@ use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
+use vstd::contrib::exec_spec::ExecSpecEq;
+
 verus! {
+
+pub enum RetirementError {
+    ReplacementNotExecuted,
+    MissingObligation,
+    MissingOldCost,
+}
+
+pub open spec fn passed_status(status: Option<&str>) -> bool {
+    match status { Some(text) => text@ == "passed"@, None => false }
+}
+
+pub open spec fn same_receipt(request: Option<&str>, receipt: Option<Option<&str>>) -> bool {
+    match (request, receipt) {
+        (None, Some(None)) => true,
+        (Some(wanted), Some(Some(actual))) => wanted@ == actual@,
+        _ => false,
+    }
+}
+
+fn test_passed(status: Option<&str>) -> (passed: bool)
+    ensures passed == (passed_status(status)),
+{
+    match status {
+        Some(status) => <&str>::exec_eq(status, "passed"),
+        None => false,
+    }
+}
+
+pub fn repair_is_complete(repaired: bool, status: Option<&str>, old_cost: bool) -> (ok: bool)
+    ensures ok == (repaired && passed_status(status) && old_cost),
+{
+    repaired && test_passed(status) && old_cost
+}
+
+// A missing receipt differs from a receipt recording retirement without replacement.
+fn preserves_obligation(request: Option<&str>, receipt: Option<Option<&str>>) -> (ok: bool)
+    ensures ok == (same_receipt(request, receipt)),
+{
+    match (request, receipt) {
+        (None, Some(None)) => true,
+        (Some(wanted), Some(Some(actual))) => <&str>::exec_eq(wanted, actual),
+        _ => false,
+    }
+}
+
+pub fn retirement_status(
+    request: Option<&str>, execution: Option<&str>, listed: bool,
+    receipt: Option<Option<&str>>, old_cost: bool,
+) -> (out: Result<&'static str, RetirementError>)
+    ensures
+        out == if request.is_some() && !passed_status(execution) {
+            Err(RetirementError::ReplacementNotExecuted)
+        } else if listed && !same_receipt(request, receipt) {
+            Err(RetirementError::MissingObligation)
+        } else if !old_cost {
+            Err(RetirementError::MissingOldCost)
+        } else if request.is_some() {
+            Ok("replaced")
+        } else {
+            Ok("retired")
+        },
+{
+    if request.is_some() && !test_passed(execution) {
+        return Err(RetirementError::ReplacementNotExecuted);
+    }
+    if listed && !preserves_obligation(request, receipt) {
+        return Err(RetirementError::MissingObligation);
+    }
+    if !old_cost {
+        return Err(RetirementError::MissingOldCost);
+    }
+    if request.is_some() { Ok("replaced") } else { Ok("retired") }
+}
 
 pub struct ConversionFacts {
     pub process_succeeded: bool,
