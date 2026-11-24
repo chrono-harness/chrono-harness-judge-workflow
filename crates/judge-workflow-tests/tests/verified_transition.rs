@@ -185,7 +185,9 @@ fn all_invalid_facts_are_rejected() {
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn retirement_keeps_the_requested_identity_and_first_failure() {
     use RetirementError::*;
-    proof { reveal_strlit("passed"); reveal_strlit("failed"); reveal_strlit("test:new"); reveal_strlit("test:other"); }
+    proof { reveal_strlit("passed"); reveal_strlit("failed");
+        assert("passed"@[0] == 'p' && "failed"@[0] == 'f'); reveal_strlit("test:new"); reveal_strlit("test:other");
+        assert("test:new"@.len() != "test:other"@.len()); }
     let request = Some("test:new");
     let passed = Some("passed");
     let ok = policy::retirement_status(request, passed, true, Some(request), true);
@@ -211,7 +213,8 @@ fn retirement_keeps_the_requested_identity_and_first_failure() {
 
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn repaired_ambiguity_needs_the_passing_replacement_and_old_cost() {
-    proof { reveal_strlit("passed"); reveal_strlit("failed"); }
+    proof { reveal_strlit("passed"); reveal_strlit("failed");
+        assert("passed"@[0] == 'p' && "failed"@[0] == 'f'); }
     if !policy::repair_is_complete(true, Some("passed"), true) { panic!(); }
     if policy::repair_is_complete(false, Some("passed"), true) { panic!(); }
     if policy::repair_is_complete(true, None, true) { panic!(); }

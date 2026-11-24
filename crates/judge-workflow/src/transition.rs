@@ -3,7 +3,7 @@ use crate::registration::Registry;
 use crate::verified_transition::{self, RetirementError};
 use crate::{facts, wire::Request};
 use serde_json::{Value, json};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 /// Adjudicate changed/removed identities; unchanged historical records are context.
 pub fn evaluate(
     reader: &facts::Reader,
@@ -47,32 +47,14 @@ pub fn evaluate(
         );
     }
     for (node, replacement) in &changes.removed_tests {
-        let id = node
-            .strip_prefix("test:")
-            .ok_or("invalid removed test identity")?;
-        let request = replacement.as_ref().map_err(Clone::clone)?;
-        let execution = request.as_ref().and_then(|to| results.tests.get(to));
-        let listed = impact["retired_tests"]
-            .as_array()
-            .ok_or("E_RETIREMENT: missing retired tests")?
-            .contains(&json!(node));
-        let status = verified_transition::retirement_status(
-            request.as_deref(),
-            execution.map(String::as_str),
-            listed,
-            results.removed.get(node).map(Option::as_deref),
-            costs["declared_before"].get(node).is_some(),
-        )
-        .map_err(|error| match error {
-            RetirementError::ReplacementNotExecuted => {
-                format!("E_REQUIRED_TEST_REMOVED: replacement not executed: {node}")
-            }
-            RetirementError::MissingObligation => {
-                "E_RETIREMENT: execution did not preserve removed obligation".into()
-            }
-            RetirementError::MissingOldCost => format!("E_RETIREMENT: old cost missing: {node}"),
-        })?;
-        decisions.push(json!({"kind":"test","id":id,"replacement":request,"status":status,"executed_old_test":false}));
+        decisions.push(retired_test_report(
+            node,
+            replacement,
+            impact,
+            &results.tests,
+            &results.removed,
+            &costs["declared_before"],
+        )?);
     }
     for owner in &changes.removed_owners {
         let replacement = owner.replacement.as_ref().map_err(Clone::clone)?;
@@ -150,5 +132,44 @@ pub fn evaluate(
     }
     Ok(
         json!({"retirements":decisions,"ambiguities":ambiguities,"migrations":migrations,"history_executed":false}),
+    )
+}
+
+/// Assemble the workflow report for one removed test from the registered views.
+pub fn retired_test_report(
+    node: &str,
+    replacement: &Result<Option<String>, String>,
+    impact: &Value,
+    tests: &BTreeMap<String, String>,
+    receipts: &BTreeMap<String, Option<String>>,
+    old_costs: &Value,
+) -> Result<Value, String> {
+    let id = node
+        .strip_prefix("test:")
+        .ok_or("invalid removed test identity")?;
+    let request = replacement.as_ref().map_err(Clone::clone)?.as_deref();
+    let execution = request.and_then(|to| tests.get(to));
+    let listed = impact["retired_tests"]
+        .as_array()
+        .ok_or("E_RETIREMENT: missing retired tests")?
+        .contains(&json!(node));
+    let status = verified_transition::retirement_status(
+        request,
+        execution.map(String::as_str),
+        listed,
+        receipts.get(node).map(Option::as_deref),
+        old_costs.get(node).is_some(),
+    )
+    .map_err(|error| match error {
+        RetirementError::ReplacementNotExecuted => {
+            format!("E_REQUIRED_TEST_REMOVED: replacement not executed: {node}")
+        }
+        RetirementError::MissingObligation => {
+            "E_RETIREMENT: execution did not preserve removed obligation".into()
+        }
+        RetirementError::MissingOldCost => format!("E_RETIREMENT: old cost missing: {node}"),
+    })?;
+    Ok(
+        json!({"kind":"test","id":id,"replacement":request,"status":status,"executed_old_test":false}),
     )
 }
