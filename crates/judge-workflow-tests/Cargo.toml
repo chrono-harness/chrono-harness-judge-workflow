@@ -33,3 +33,7 @@ path = "tests/verified_execution.rs"
 [[test]]
 name = "observation_age"
 path = "tests/observation_age.rs"
+
+[[test]]
+name = "installed_judge"
+path = "tests/installed_judge.rs"
