@@ -4,7 +4,8 @@
 #[path = "../../judge-workflow/src/verified_transition.rs"]
 mod policy;
 
-use policy::{ConversionFacts, MigrationError, MigrationFacts};
+use policy::{ConversionFacts, MigrationError, MigrationFacts, RetirementError};
+use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
@@ -179,6 +180,46 @@ fn all_invalid_facts_are_rejected() {
     facts.test_matches = false;
     facts.conversion = None;
     expect(policy::admit_migration(facts), Some(MigrationError::PairMismatch));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn retirement_keeps_the_requested_identity_and_first_failure() {
+    use RetirementError::*;
+    proof { reveal_strlit("passed"); reveal_strlit("failed");
+        assert("passed"@[0] == 'p' && "failed"@[0] == 'f'); reveal_strlit("test:new"); reveal_strlit("test:other");
+        assert("test:new"@.len() != "test:other"@.len()); }
+    let request = Some("test:new");
+    let passed = Some("passed");
+    let ok = policy::retirement_status(request, passed, true, Some(request), true);
+    match ok {
+        Ok(status) => if !<&str>::exec_eq(status, "replaced") { panic!(); },
+        _ => { panic!(); },
+    }
+    let ok = policy::retirement_status(None, None, true, Some(None), true);
+    match ok {
+        Ok(status) => if !<&str>::exec_eq(status, "retired") { panic!(); },
+        _ => { panic!(); },
+    }
+    if !policy::retirement_status(request, passed, false, None, true).is_ok() { panic!(); }
+    if !matches!(policy::retirement_status(request, Some("failed"), true, None, false),
+                 Err(ReplacementNotExecuted)) { panic!(); }
+    if !matches!(policy::retirement_status(request, passed, true, Some(Some("test:other")), false),
+                 Err(MissingObligation)) { panic!(); }
+    if !matches!(policy::retirement_status(None, None, true, None, true),
+                 Err(MissingObligation)) { panic!(); }
+    if !matches!(policy::retirement_status(None, None, true, Some(None), false),
+                 Err(MissingOldCost)) { panic!(); }
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn repaired_ambiguity_needs_the_passing_replacement_and_old_cost() {
+    proof { reveal_strlit("passed"); reveal_strlit("failed");
+        assert("passed"@[0] == 'p' && "failed"@[0] == 'f'); }
+    if !policy::repair_is_complete(true, Some("passed"), true) { panic!(); }
+    if policy::repair_is_complete(false, Some("passed"), true) { panic!(); }
+    if policy::repair_is_complete(true, None, true) { panic!(); }
+    if policy::repair_is_complete(true, Some("failed"), true) { panic!(); }
+    if policy::repair_is_complete(true, Some("passed"), false) { panic!(); }
 }
 
 }
