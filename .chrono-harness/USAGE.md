@@ -14,4 +14,4 @@
 
 ## 本仓验证
 
-产品位于 [`crates/judge-workflow`](../crates/judge-workflow)。原生测试位于 [`crates/judge-workflow-tests`](../crates/judge-workflow-tests)。在仓库根目录运行 `mise exec -- ./check.sh` 执行本仓的检查。
+产品位于 [`crates/judge-workflow`](../crates/judge-workflow)。原生测试位于 [`crates/judge-workflow-tests`](../crates/judge-workflow-tests)。在仓库根目录运行 `mise exec -- ./check.sh` 按 Git 变更选择分支、执行和证书的生产证明、独立边界预期及原生检查。GitHub 汇总读取固定候选的单元原件。

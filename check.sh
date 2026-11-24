@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
-native_only=false
-if [[ ${1:-} == --native && $# -eq 1 ]]; then
-  native_only=true
-elif [[ $# -ne 0 ]]; then
+if [[ $# -eq 0 ]]; then
+  /bin/sh .chrono-harness/ci/install.sh
+  export PATH="$PWD/.chrono-harness/bin:$PATH"
+  export CHRONO_CHECK_SOURCE=${CHRONO_CHECK_SOURCE:-local}
+  exec .chrono-harness/bin/chrono-harness check
+fi
+if [[ $# -ne 1 || $1 != --native ]]; then
   echo 'usage: ./check.sh [--native]' >&2
   exit 2
 fi
@@ -39,44 +42,18 @@ chrono-host-bootstrap check-compiler-sources native "$stem" \
   src/routes.rs src/projects.rs ||
   coverage_failure "native library differs from required sources"
 
-if "$native_only"; then exit 0; fi
-
-prove() {
-  chrono-host-bootstrap run-compiler-proof "$scratch" "$1" "${VERUS:-verus}" "$2" ||
-    coverage_failure "$1: verifier execution failed"
-}
-
-admit_proof() {
-  local operation=$1
-  shift
-  chrono-host-bootstrap collect-compiler-proof "$scratch" "$operation" "${VERUS:-verus}" \
-    0.2026.04.24.f8e1704 f8e17045c4ac17a02e566b8997070f2eecc255be "$@" ||
-    coverage_failure "$operation: required proof execution was not admitted"
-}
-
 src=crates/judge-workflow/src
 tests=crates/judge-workflow-tests/tests
 included="$tests/../../judge-workflow/src"
 
-prove verify.judge-workflow "$src/verified_branch.rs"
-prove verify.judge-workflow-evidence "$src/verified_evidence.rs"
-prove verify.judge-workflow-execution "$src/verified_execution.rs"
-prove verify.judge-workflow-certificate "$src/verified_certificate.rs"
-prove verify.judge-workflow-transition "$src/verified_transition.rs"
-prove verify.judge-workflow-tests "$tests/verified_branch.rs"
-prove verify.judge-workflow-evidence-tests "$tests/verified_evidence.rs"
-prove verify.judge-workflow-certificate-tests "$tests/verified_certificate.rs"
-prove verify.judge-workflow-transition-tests "$tests/verified_transition.rs"
-prove verify.judge-workflow-execution-tests "$tests/verified_execution.rs"
-
-admit_proof verify.judge-workflow "$src/verified_branch.rs"
-admit_proof verify.judge-workflow-evidence "$src/verified_evidence.rs"
-admit_proof verify.judge-workflow-execution "$src/verified_execution.rs" "$src/verified_response.rs"
-admit_proof verify.judge-workflow-certificate "$src/verified_certificate.rs"
-admit_proof verify.judge-workflow-transition "$src/verified_transition.rs"
-admit_proof verify.judge-workflow-tests "$tests/verified_branch.rs" "$included/verified_branch.rs"
-admit_proof verify.judge-workflow-evidence-tests "$tests/verified_evidence.rs" "$included/verified_evidence.rs"
-admit_proof verify.judge-workflow-certificate-tests "$tests/verified_certificate.rs" "$included/verified_certificate.rs"
-admit_proof verify.judge-workflow-transition-tests "$tests/verified_transition.rs" "$included/verified_transition.rs"
-admit_proof verify.judge-workflow-execution-tests "$tests/verified_execution.rs" "$tests/proof_support/judge-workflow/full_short.rs" \
+chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow.rlib "$src/verified_branch.rs"
+chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-evidence.rlib "$src/verified_evidence.rs"
+chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-execution.rlib "$src/verified_execution.rs" "$src/verified_response.rs"
+chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-certificate.rlib "$src/verified_certificate.rs"
+chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-transition.rlib "$src/verified_transition.rs"
+chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-tests.rlib "$tests/verified_branch.rs" "$included/verified_branch.rs"
+chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-evidence-tests.rlib "$tests/verified_evidence.rs" "$included/verified_evidence.rs"
+chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-certificate-tests.rlib "$tests/verified_certificate.rs" "$included/verified_certificate.rs"
+chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-transition-tests.rlib "$tests/verified_transition.rs" "$included/verified_transition.rs"
+chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-execution-tests.rlib "$tests/verified_execution.rs" "$tests/proof_support/judge-workflow/full_short.rs" \
   "$included/verified_execution.rs" "$included/verified_response.rs"
