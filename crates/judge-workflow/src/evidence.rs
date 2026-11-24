@@ -289,11 +289,11 @@ pub fn binding(
         if defs.len() != 1
             || !seen.insert(id.clone())
             || v["binding"] != *defs[0]
-            || p.executable
-                != req
-                    .candidate
-                    .root
-                    .join(defs[0]["executable"].as_str().unwrap())
+            || !crate::installed_judge::matches(
+                &req.candidate.root,
+                defs[0]["executable"].as_str().unwrap(),
+                &p.executable,
+            )
             || defs[0]["sha256"] != p.sha256
             || p.cwd != req.candidate.root
             || p.environment != plan.environment
@@ -330,11 +330,11 @@ pub fn binding(
         .collect();
     if defs.len() != 1
         || defs[0]["sha256"] != sha256(&bytes)
-        || myself
-            != req
-                .candidate
-                .root
-                .join(defs[0]["executable"].as_str().unwrap())
+        || !crate::installed_judge::matches(
+            &req.candidate.root,
+            defs[0]["executable"].as_str().unwrap(),
+            &myself,
+        )
     {
         return Err("E_WORKFLOW_EVIDENCE: current workflow executable".into());
     }

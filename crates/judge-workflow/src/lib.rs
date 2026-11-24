@@ -2,6 +2,7 @@
 mod branch;
 mod certificate;
 mod evidence;
+mod installed_judge;
 mod projects;
 mod query;
 mod registration;
