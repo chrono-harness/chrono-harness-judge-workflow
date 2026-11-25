@@ -16,8 +16,8 @@ pub struct Connection {
     operation: &'static str,
 }
 impl Connection {
-    pub fn open(root: &Path, operation: &'static str) -> Result<Self, String> {
-        let mut child = Command::new("chrono-harness")
+    pub fn open(program: &Path, root: &Path, operation: &'static str) -> Result<Self, String> {
+        let mut child = Command::new(program)
             .arg(operation)
             .current_dir(root)
             .stdin(Stdio::piped())

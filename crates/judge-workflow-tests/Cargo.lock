@@ -25,8 +25,9 @@ checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
 name = "chrono-judge-workflow"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
+ "libc",
  "serde",
  "serde_jcs",
  "serde_json",
@@ -40,7 +41,9 @@ name = "chrono-judge-workflow-tests"
 version = "0.1.0"
 dependencies = [
  "chrono-judge-workflow",
+ "libc",
  "serde_json",
+ "sha2",
  "vstd",
 ]
 

@@ -64,21 +64,50 @@ pub struct Request {
     #[serde(flatten)]
     other: Other,
     #[serde(skip)]
+    bound_runner: OnceCell<Result<PathBuf, String>>,
+    #[serde(skip)]
     artifacts: OnceCell<Result<Connection, String>>,
     #[serde(skip)]
     evidence: OnceCell<Result<Connection, String>>,
 }
 impl Request {
+    pub fn runner_path(&self) -> Result<&std::path::Path, String> {
+        self.bound_runner
+            .get_or_init(|| {
+                let search =
+                    std::env::var_os("PATH").ok_or("E_EXECUTABLE_BINDING: missing judge PATH")?;
+                crate::installed_judge::bound_runner(
+                    &self.candidate.root,
+                    &search,
+                    &self.runner.sha256,
+                )
+            })
+            .as_deref()
+            .map_err(Clone::clone)
+    }
+
     pub fn artifact<T: serde::de::DeserializeOwned>(&self, op: Value) -> Result<T, String> {
         self.artifacts
-            .get_or_init(|| Connection::open(&self.candidate.root, "retained-artifacts-v1"))
+            .get_or_init(|| {
+                Connection::open(
+                    self.runner_path()?,
+                    &self.candidate.root,
+                    "retained-artifacts-v1",
+                )
+            })
             .as_ref()
             .map_err(Clone::clone)?
             .call(&op)
     }
     pub fn evidence<T: serde::de::DeserializeOwned>(&self, op: Value) -> Result<T, String> {
         self.evidence
-            .get_or_init(|| Connection::open(&self.candidate.root, "judge-evidence-v1"))
+            .get_or_init(|| {
+                Connection::open(
+                    self.runner_path()?,
+                    &self.candidate.root,
+                    "judge-evidence-v1",
+                )
+            })
             .as_ref()
             .map_err(Clone::clone)?
             .call(&op)

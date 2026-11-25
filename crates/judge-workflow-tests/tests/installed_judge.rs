@@ -27,3 +27,48 @@ fn registered_installation_link_must_resolve_to_the_observed_executable() {
     assert!(installed_judge::matches(&scratch, "release", &observed));
     fs::remove_dir_all(scratch).unwrap();
 }
+
+#[cfg(unix)]
+#[test]
+fn request_uses_the_first_executable_on_its_path_only_if_its_bytes_match() {
+    use sha2::{Digest, Sha256};
+    use std::{
+        env, fs,
+        os::unix::fs::{PermissionsExt, symlink},
+        path::Path,
+    };
+
+    let root = env::temp_dir().join(format!("workflow-runner-{}", std::process::id()));
+    let first = root.join("first");
+    let last = root.join("last");
+    fs::create_dir_all(&first).unwrap();
+    fs::create_dir_all(&last).unwrap();
+    let search = env::join_paths([Path::new("first"), &last]).unwrap();
+    let expected = format!("{:x}", Sha256::digest(b"release"));
+    let resolve = || installed_judge::bound_runner(&root, &search, &expected);
+    assert!(resolve().unwrap_err().contains("missing"));
+    let release = last.join("chrono-harness");
+    fs::write(&release, b"release").unwrap();
+    fs::set_permissions(&release, fs::Permissions::from_mode(0o700)).unwrap();
+    let earlier = first.join("chrono-harness");
+    fs::write(&earlier, b"older release").unwrap();
+    fs::set_permissions(&earlier, fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(resolve().unwrap(), release.canonicalize().unwrap());
+    // These files belong to the caller. Group and other execution bits
+    // do not grant their owner execute access when the owner bit is clear.
+    // The superuser may execute a regular file with any execute bit.
+    if unsafe { libc::geteuid() } != 0 {
+        fs::set_permissions(&earlier, fs::Permissions::from_mode(0o611)).unwrap();
+        assert_eq!(resolve().unwrap(), release.canonicalize().unwrap());
+    }
+    fs::set_permissions(&earlier, fs::Permissions::from_mode(0o700)).unwrap();
+    let err = resolve().unwrap_err();
+    assert!(err.contains(&format!("{:x}", Sha256::digest(b"older release"))));
+    assert!(err.contains(&expected));
+    fs::write(&earlier, b"release").unwrap();
+    assert_eq!(resolve().unwrap(), earlier.canonicalize().unwrap());
+    fs::remove_file(&earlier).unwrap();
+    symlink(&release, &earlier).unwrap();
+    assert_eq!(resolve().unwrap(), release.canonicalize().unwrap());
+    fs::remove_dir_all(root).unwrap();
+}

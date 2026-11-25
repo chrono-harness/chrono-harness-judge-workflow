@@ -1,6 +1,6 @@
 [package]
 name = "chrono-judge-workflow"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 publish = false
 
@@ -15,6 +15,7 @@ test = false
 bench = false
 
 [dependencies]
+libc = "0.2"
 vstd = "=0.0.0-2026-04-20-1748"
 sha2 = "0.10"
 serde_jcs = "=0.2.0"
