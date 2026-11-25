@@ -25,6 +25,8 @@ mise run harness-setup
 
 开始和结束任务时，用 `mise exec -- chrono-pr pr-reminders` 查看本工作树中自己打开的 PR。用 `mise exec -- chrono-pr pr-status --pr NUMBER --head-sha SHA` 核对指定候选。
 
+本地完整检查报告的保留期限和定时维护入口见 [开发机检查原件](.chrono-harness/USAGE.md)。
+
 ## 基础指令
 
 默认采用上游全部现有规则和以后新增的规则。`.chrono-harness/rules.json` 中的 `{"mode":"all"}` 表示全选。要屏蔽个别规则，在 all 模式设置 `exclude`。要只选几条，设置 `mode` 为 `only` 并填写 `include`。要关闭继承，使用 `{"mode":"off"}`。
