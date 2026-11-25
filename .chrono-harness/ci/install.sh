@@ -41,7 +41,7 @@ esac
 if [ "${GITHUB_ACTIONS:-}" = true ]; then
     export MISE_TRUSTED_CONFIG_PATHS="$PWD"
 fi
-set -- chrono-harness chrono-worktree chrono-diagnostics chrono-ci chrono-judge-ci chrono-judge-routes chrono-judge-registration chrono-judge-projects chrono-judge-filemap chrono-host-bootstrap verus
+set -- chrono-harness chrono-worktree chrono-diagnostics chrono-ci chrono-judge-ci chrono-judge-routes chrono-judge-registration chrono-judge-projects chrono-judge-filemap chrono-judge-mixed chrono-host-bootstrap verus
 mkdir -p .chrono-harness/bin
 for tool do
     if ! executable=$("$manager" which "$tool" 2>/dev/null); then
