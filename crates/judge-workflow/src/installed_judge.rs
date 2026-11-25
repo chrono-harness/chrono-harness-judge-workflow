@@ -18,10 +18,14 @@ pub(crate) fn bound_runner(
     use sha2::{Digest, Sha256};
     use std::{env, fs, io};
 
-    let entry = env::split_paths(search)
+    let entries: Vec<_> = env::split_paths(search)
         .map(|dir| root.join(dir).join("chrono-harness"))
-        .find(|path| executable_for_judge(path))
-        .ok_or("E_EXECUTABLE_BINDING: chrono-harness missing from judge PATH")?;
+        .collect();
+    let index = crate::verified_evidence::first_executable(entries.len(), |i| {
+        executable_for_judge(&entries[i])
+    })
+    .ok_or("E_EXECUTABLE_BINDING: chrono-harness missing from judge PATH")?;
+    let entry = &entries[index];
     let path = entry
         .canonicalize()
         .map_err(|e| format!("E_EXECUTABLE_BINDING: {}: {e}", entry.display()))?;
@@ -31,13 +35,12 @@ pub(crate) fn bound_runner(
     io::copy(&mut file, &mut digest)
         .map_err(|e| format!("E_EXECUTABLE_BINDING: {}: {e}", path.display()))?;
     let actual = format!("{:x}", digest.finalize());
-    if actual != expected {
-        return Err(format!(
+    crate::verified_evidence::bind_digest(path, &actual, expected).map_err(|path| {
+        format!(
             "E_EXECUTABLE_BINDING: chrono-harness {} has sha256 {actual}, expected {expected}",
             path.display()
-        ));
-    }
-    Ok(path)
+        )
+    })
 }
 
 /// Ask the kernel about execution for this process, including its effective
