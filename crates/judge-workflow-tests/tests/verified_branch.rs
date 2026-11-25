@@ -84,4 +84,30 @@ fn a_fork_must_be_reachable_from_both_endpoints() {
     assert(both && !only_dev && !only_candidate && !neither);
 }
 
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn observation_times_require_utc_and_allow_equality() {
+    let west = policy::is_utc_offset(-1);
+    let utc = policy::is_utc_offset(0);
+    let east = policy::is_utc_offset(1);
+    assert(!west && utc && !east);
+    let earlier = policy::current_observation_allowed(-2, -1);
+    let equal = policy::current_observation_allowed(-1, -1);
+    let later = policy::current_observation_allowed(0, -1);
+    assert(!earlier && equal && later);
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn signed_age_yields_an_exact_duration_or_a_distinct_context_error() {
+    let negative = policy::checked_age_ns(-1);
+    let zero = policy::checked_age_ns(0);
+    let positive = policy::checked_age_ns(1);
+    let largest = policy::checked_age_ns(u64::MAX as i128);
+    let too_large = policy::checked_age_ns(u64::MAX as i128 + 1);
+    assert(matches!(negative, Err(policy::AgeError::Negative)));
+    assert(matches!(zero, Ok(0)));
+    assert(matches!(positive, Ok(1)));
+    assert(matches!(largest, Ok(value) if value == u64::MAX));
+    assert(matches!(too_large, Err(policy::AgeError::OutOfRange)));
+}
+
 }
