@@ -57,4 +57,31 @@ fn age_limit_is_inclusive_and_preserves_unsigned_boundaries() {
     assert(zero && exact && !one_over && largest && below_largest);
 }
 
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn truncation_requires_a_relevant_endpoint_beyond_the_fork() {
+    let dev = policy::truncates_branch_history(true, false, false);
+    let candidate = policy::truncates_branch_history(false, true, false);
+    let both = policy::truncates_branch_history(true, true, false);
+    let unrelated = policy::truncates_branch_history(false, false, false);
+    assert(dev && candidate && both && !unrelated);
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn a_boundary_in_fork_history_is_admissible_for_each_endpoint() {
+    let dev = policy::truncates_branch_history(true, false, true);
+    let candidate = policy::truncates_branch_history(false, true, true);
+    let both = policy::truncates_branch_history(true, true, true);
+    let neither = policy::truncates_branch_history(false, false, true);
+    assert(!dev && !candidate && !both && !neither);
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn a_fork_must_be_reachable_from_both_endpoints() {
+    let both = policy::fork_is_common(true, true);
+    let only_dev = policy::fork_is_common(true, false);
+    let only_candidate = policy::fork_is_common(false, true);
+    let neither = policy::fork_is_common(false, false);
+    assert(both && !only_dev && !only_candidate && !neither);
+}
+
 }

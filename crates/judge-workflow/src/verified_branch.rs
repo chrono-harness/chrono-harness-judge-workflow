@@ -75,4 +75,17 @@ pub fn age_within_limit(age_ns: u64, max_age_ns: u64) -> (allowed: bool)
     age_ns <= max_age_ns
 }
 
+/// A shallow boundary is relevant when it truncates either endpoint after the fork.
+pub fn truncates_branch_history(in_dev: bool, in_candidate: bool, in_fork: bool) -> (missing: bool)
+    ensures missing == ((in_dev || in_candidate) && !in_fork),
+{
+    (in_dev || in_candidate) && !in_fork
+}
+
+pub fn fork_is_common(in_dev: bool, in_candidate: bool) -> (common: bool)
+    ensures common == (in_dev && in_candidate),
+{
+    in_dev && in_candidate
+}
+
 }

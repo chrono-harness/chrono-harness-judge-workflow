@@ -136,13 +136,18 @@ pub fn with_reader(
         reader.call::<BTreeSet<String>>(json!({"op":"ancestors","commit":fork}))?;
     let boundaries: Vec<String> = reader.call(json!({"op":"shallow-boundaries"}))?;
     for s in &boundaries {
-        if (dev_ancestors.contains(s) || branch_ancestors.contains(s))
-            && !fork_ancestors.contains(s)
-        {
+        if verified_branch::truncates_branch_history(
+            dev_ancestors.contains(s),
+            branch_ancestors.contains(s),
+            fork_ancestors.contains(s),
+        ) {
             return Err("E_HISTORY_MISSING: truncated ancestry beyond fork".into());
         }
     }
-    if !dev_ancestors.contains(fork) || !branch_ancestors.contains(fork) {
+    if !verified_branch::fork_is_common(
+        dev_ancestors.contains(fork),
+        branch_ancestors.contains(fork),
+    ) {
         return Err("E_BRANCH_CONTEXT: fork is not a common ancestor".into());
     }
     let behind = dev_ancestors.difference(&fork_ancestors).count();
