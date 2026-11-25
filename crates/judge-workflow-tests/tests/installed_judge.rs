@@ -1,5 +1,8 @@
 #[path = "../../judge-workflow/src/installed_judge.rs"]
 mod installed_judge;
+#[allow(dead_code)]
+#[path = "../../judge-workflow/src/verified_evidence.rs"]
+mod verified_evidence;
 
 #[cfg(unix)]
 #[test]
