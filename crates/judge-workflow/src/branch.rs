@@ -63,7 +63,9 @@ fn age_at(ctx: &Value, w: &Value, observed: OffsetDateTime) -> Result<time::Dura
     let age_ns = verified_branch::checked_age_ns(age.whole_nanoseconds()).map_err(|reason| {
         match reason {
             verified_branch::AgeError::Negative => "E_BRANCH_CONTEXT: negative age",
-            verified_branch::AgeError::OutOfRange => "E_BRANCH_CONTEXT: age exceeds supported range",
+            verified_branch::AgeError::OutOfRange => {
+                "E_BRANCH_CONTEXT: age exceeds supported range"
+            }
         }
         .to_string()
     })?;

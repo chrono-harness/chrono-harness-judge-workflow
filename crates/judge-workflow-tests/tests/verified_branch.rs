@@ -106,7 +106,7 @@ fn signed_age_yields_an_exact_duration_or_a_distinct_context_error() {
     assert(matches!(negative, Err(policy::AgeError::Negative)));
     assert(matches!(zero, Ok(0)));
     assert(matches!(positive, Ok(1)));
-    assert(matches!(largest, Ok(u64::MAX)));
+    assert(matches!(largest, Ok(value) if value == u64::MAX));
     assert(matches!(too_large, Err(policy::AgeError::OutOfRange)));
 }
 
