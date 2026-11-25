@@ -125,6 +125,18 @@
       }
     },
     {
+      "path": ".chrono-harness/native-check.sh",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ]
+    },
+    {
       "path": ".chrono-harness/pr.json",
       "owner": "host",
       "surface": "product",
