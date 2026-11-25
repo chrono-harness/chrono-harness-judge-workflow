@@ -1,5 +1,5 @@
 use crate::projects::Results;
-use crate::registration::Registry;
+use crate::registration::{Changes, Registry};
 use crate::verified_transition::{self, RetirementError};
 use crate::{facts, wire::Request};
 use serde_json::{Value, json};
@@ -13,53 +13,13 @@ pub fn evaluate(
     results: &Results,
     costs: &Value,
 ) -> Result<Value, String> {
-    let changes = b
-        .changes
-        .as_ref()
-        .ok_or("missing workflow transition declarations")?;
-    let requests = changes.requests.as_ref().map_err(Clone::clone)?;
-    let mut decisions = vec![];
-    let mut ambiguities = vec![];
-    for required in impact["required_tests"]
-        .as_array()
-        .ok_or("E_RETIREMENT: missing obligations")?
-    {
-        let node = required["node"].as_str().ok_or("E_RETIREMENT: test node")?;
-        let Some(ambiguity) = changes.ambiguities.get(node) else {
-            continue;
-        };
-        let definitions = &ambiguity.definitions;
-        let target = requests
-            .get(node)
-            .and_then(|v| v.as_deref())
-            .unwrap_or(node);
-        if !verified_transition::repair_is_complete(
-            ambiguity.repaired,
-            results.tests.get(target).map(String::as_str),
-            costs["declared_before"].get(node).is_some(),
-        ) {
-            return Err(format!(
-                "E_RETIREMENT: ambiguity needs explicit repair, old costs and executed replacement: {node}"
-            ));
-        }
-        ambiguities.push(
-            json!({"node":node,"definitions":definitions,"replacement":target,"status":"repaired"}),
-        );
-    }
-    for (node, replacement) in &changes.removed_tests {
-        decisions.push(retired_test_report(
-            node,
-            replacement,
-            impact,
-            &results.tests,
-            &results.removed,
-            &costs["declared_before"],
-        )?);
-    }
-    for owner in &changes.removed_owners {
-        let replacement = owner.replacement.as_ref().map_err(Clone::clone)?;
-        decisions.push(json!({"kind": owner.kind, "id": owner.id, "replacement": replacement, "status":"declared-removal"}));
-    }
+    let (decisions, ambiguities) = retirement_reports(
+        b.changes.as_ref(),
+        impact,
+        &results.tests,
+        &results.removed,
+        &costs["declared_before"],
+    )?;
     let base = reader.snapshot("base")?;
     let current = reader.snapshot("candidate")?;
     let (raw, raw_config) = (base.values, base.effective_path);
@@ -133,6 +93,57 @@ pub fn evaluate(
     Ok(
         json!({"retirements":decisions,"ambiguities":ambiguities,"migrations":migrations,"history_executed":false}),
     )
+}
+
+/// Resolve required repairs before reporting the declared test and owner retirements.
+pub fn retirement_reports(
+    changes: Option<&Changes>,
+    impact: &Value,
+    tests: &BTreeMap<String, String>,
+    receipts: &BTreeMap<String, Option<String>>,
+    old_costs: &Value,
+) -> Result<(Vec<Value>, Vec<Value>), String> {
+    let declarations = changes.map(|c| (c, c.requests.as_ref().map_err(String::as_str)));
+    let (changes, requests, required_tests) =
+        verified_transition::transition_inputs(declarations, impact["required_tests"].as_array())?;
+    let mut decisions = vec![];
+    let mut ambiguities = vec![];
+    for required in required_tests {
+        let node = verified_transition::repair_node(required["node"].as_str())?;
+        let Some(ambiguity) = changes.ambiguities.get(node) else {
+            continue;
+        };
+        let definitions = &ambiguity.definitions;
+        let target =
+            verified_transition::repair_target(node, requests.get(node).map(Option::as_deref));
+        if !verified_transition::repair_is_complete(
+            ambiguity.repaired,
+            tests.get(target).map(String::as_str),
+            old_costs.get(node).is_some(),
+        ) {
+            return Err(format!(
+                "E_RETIREMENT: ambiguity needs explicit repair, old costs and executed replacement: {node}"
+            ));
+        }
+        ambiguities.push(
+            json!({"node":node,"definitions":definitions,"replacement":target,"status":"repaired"}),
+        );
+    }
+    for (node, replacement) in &changes.removed_tests {
+        decisions.push(retired_test_report(
+            node,
+            replacement,
+            impact,
+            tests,
+            receipts,
+            old_costs,
+        )?);
+    }
+    for owner in &changes.removed_owners {
+        let replacement = owner.replacement.as_ref().map_err(Clone::clone)?;
+        decisions.push(json!({"kind": owner.kind, "id": owner.id, "replacement": replacement, "status":"declared-removal"}));
+    }
+    Ok((decisions, ambiguities))
 }
 
 /// Assemble the workflow report for one removed test from the registered views.
