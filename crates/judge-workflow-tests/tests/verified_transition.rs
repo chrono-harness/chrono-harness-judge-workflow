@@ -15,6 +15,32 @@ use vstd::vpanic as panic;
 
 verus! {
 
+#[cfg(verus_keep_ghost)]
+fn required_declaration_priority(has_declaration: bool, request_error: bool, has_obligations: bool, message: &str) {
+    let c = 11u8; let q = 22u8; let rows = 33u8;
+    let requests = if request_error { Err(message) } else { Ok(&q) };
+    let declaration = if has_declaration { Some((&c, requests)) } else { None };
+    let obligations = if has_obligations { Some(&rows) } else { None };
+    let result = policy::transition_inputs(declaration, obligations);
+    if !has_declaration { assert(result.unwrap_err()@ == "missing workflow transition declarations"@); }
+    else if request_error { assert(result.unwrap_err()@ == message@); }
+    else if !has_obligations { assert(result.unwrap_err()@ == "E_RETIREMENT: missing obligations"@); }
+    else { assert(result.unwrap() == (&c,&q,&rows)); }
+}
+
+#[cfg(verus_keep_ghost)]
+fn required_repair_identity(node: &str, other: &str) {
+    let missing = policy::repair_node(None);
+    assert(missing.unwrap_err()@ == "E_RETIREMENT: test node"@);
+    let original = policy::repair_node(Some(node));
+    assert(original.unwrap()@ == node@);
+    let absent = policy::repair_target(node, None);
+    let unassigned = policy::repair_target(node, Some(None));
+    let assigned = policy::repair_target(node, Some(Some(other)));
+    assert(absent@ == node@ && unassigned@ == node@ && assigned@ == other@);
+}
+
+
 fn expect(out: Result<(), MigrationError>, expected: Option<MigrationError>)
     requires match expected {
         None => out.is_ok(),

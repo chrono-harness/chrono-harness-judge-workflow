@@ -10,6 +10,44 @@ use vstd::contrib::exec_spec::ExecSpecEq;
 
 verus! {
 
+/// Keep the first failure and the exact registered inputs used by the caller.
+pub fn transition_inputs<'a, D, Q, O>(
+    declaration: Option<(&'a D, Result<&'a Q, &'a str>)>, obligations: Option<&'a O>,
+) -> (out: Result<(&'a D, &'a Q, &'a O), &'a str>)
+    ensures match declaration {
+        None => out == Err::<(&D, &Q, &O), &str>("missing workflow transition declarations"),
+        Some((changes, Err(message))) => out == Err::<(&D, &Q, &O), &str>(message),
+        Some((changes, Ok(requests))) => match obligations {
+            None => out == Err::<(&D, &Q, &O), &str>("E_RETIREMENT: missing obligations"),
+            Some(rows) => out == Ok::<(&D, &Q, &O), &str>((changes, requests, rows)),
+        },
+    },
+{
+    match declaration {
+        None => Err("missing workflow transition declarations"),
+        Some((_, Err(message))) => Err(message),
+        Some((changes, Ok(requests))) => match obligations {
+            None => Err("E_RETIREMENT: missing obligations"),
+            Some(rows) => Ok((changes, requests, rows)),
+        },
+    }
+}
+
+pub fn repair_node(node: Option<&str>) -> (out: Result<&str, &str>)
+    ensures match node {
+        Some(id) => out == Ok::<&str, &str>(id),
+        None => out == Err::<&str, &str>("E_RETIREMENT: test node"),
+    },
+{
+    match node { Some(id) => Ok(id), None => Err("E_RETIREMENT: test node") }
+}
+
+pub fn repair_target<'a>(node: &'a str, request: Option<Option<&'a str>>) -> (target: &'a str)
+    ensures target@ == match request { Some(Some(replacement)) => replacement@, _ => node@ },
+{
+    match request { Some(Some(replacement)) => replacement, _ => node }
+}
+
 pub enum RetirementError {
     ReplacementNotExecuted,
     MissingObligation,

@@ -8,7 +8,7 @@ mod query;
 mod registration;
 mod routes;
 mod transition;
-pub use transition::retired_test_report;
+pub use transition::{retired_test_report, retirement_reports};
 mod verified_branch;
 mod verified_certificate;
 mod verified_evidence;
