@@ -42,18 +42,4 @@ chrono-host-bootstrap check-compiler-sources native "$stem" \
   src/routes.rs src/projects.rs ||
   coverage_failure "native library differs from required sources"
 
-src=crates/judge-workflow/src
-tests=crates/judge-workflow-tests/tests
-included="$tests/../../judge-workflow/src"
-
-chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow.rlib "$src/verified_branch.rs"
-chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-evidence.rlib "$src/verified_evidence.rs"
-chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-execution.rlib "$src/verified_execution.rs" "$src/verified_response.rs"
-chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-certificate.rlib "$src/verified_certificate.rs"
-chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-transition.rlib "$src/verified_transition.rs"
-chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-tests.rlib "$tests/verified_branch.rs" "$included/verified_branch.rs"
-chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-evidence-tests.rlib "$tests/verified_evidence.rs" "$included/verified_evidence.rs"
-chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-certificate-tests.rlib "$tests/verified_certificate.rs" "$included/verified_certificate.rs"
-chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-transition-tests.rlib "$tests/verified_transition.rs" "$included/verified_transition.rs"
-chrono-host-bootstrap check-compiler-sources proof .chrono-harness/state/verify.judge-workflow-execution-tests.rlib "$tests/verified_execution.rs" "$tests/proof_support/judge-workflow/full_short.rs" \
-  "$included/verified_execution.rs" "$included/verified_response.rs"
+# CI binds the ten Verus receipts to their registered sources in FILEMAP.
