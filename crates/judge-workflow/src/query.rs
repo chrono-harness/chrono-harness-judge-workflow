@@ -85,7 +85,7 @@ pub(crate) fn run(
     if let Some(digest) = digest {
         header["expected_sha256"] = json!(digest);
     }
-    let mut child = Command::new("chrono-harness")
+    let mut child = Command::new(req.runner_path()?)
         .arg("run-command-v1")
         .current_dir(&req.candidate.root)
         .stdin(Stdio::piped())

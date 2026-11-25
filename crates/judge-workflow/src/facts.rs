@@ -14,17 +14,21 @@ pub struct Snapshot {
 }
 impl Reader {
     pub fn for_request(req: &Request) -> Result<Self, String> {
-        Self::open(&req.candidate.root, json!({"mode":"request","request":req}))
+        Self::open(
+            req.runner_path()?,
+            &req.candidate.root,
+            json!({"mode":"request","request":req}),
+        )
     }
     pub fn legacy(root: &Path) -> Result<Self, String> {
-        Self::open(root, json!({"mode":"history"}))
+        Self::open(Path::new("chrono-harness"), root, json!({"mode":"history"}))
     }
-    fn open(root: &Path, header: Value) -> Result<Self, String> {
+    fn open(program: &Path, root: &Path, header: Value) -> Result<Self, String> {
         #[derive(Deserialize)]
         struct Open {
             bound: bool,
         }
-        let session = Connection::open(root, "git-facts-v1")?;
+        let session = Connection::open(program, root, "git-facts-v1")?;
         let Open { bound } = session.call(&header)?;
         Ok(Self { session, bound })
     }
