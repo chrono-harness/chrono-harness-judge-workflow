@@ -54,6 +54,13 @@ fn request_uses_the_first_executable_on_its_path_only_if_its_bytes_match() {
     fs::write(&earlier, b"older release").unwrap();
     fs::set_permissions(&earlier, fs::Permissions::from_mode(0o600)).unwrap();
     assert_eq!(resolve().unwrap(), release.canonicalize().unwrap());
+    // These files belong to the caller. Group and other execution bits
+    // do not grant their owner execute access when the owner bit is clear.
+    // The superuser may execute a regular file with any execute bit.
+    if unsafe { libc::geteuid() } != 0 {
+        fs::set_permissions(&earlier, fs::Permissions::from_mode(0o611)).unwrap();
+        assert_eq!(resolve().unwrap(), release.canonicalize().unwrap());
+    }
     fs::set_permissions(&earlier, fs::Permissions::from_mode(0o700)).unwrap();
     let err = resolve().unwrap_err();
     assert!(err.contains(&format!("{:x}", Sha256::digest(b"older release"))));

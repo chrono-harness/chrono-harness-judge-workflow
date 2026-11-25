@@ -16,14 +16,11 @@ pub(crate) fn bound_runner(
     expected: &str,
 ) -> Result<std::path::PathBuf, String> {
     use sha2::{Digest, Sha256};
-    use std::{env, fs, io, os::unix::fs::PermissionsExt};
+    use std::{env, fs, io};
 
     let entry = env::split_paths(search)
         .map(|dir| root.join(dir).join("chrono-harness"))
-        .find(|path| {
-            path.metadata()
-                .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
-        })
+        .find(|path| executable_for_judge(path))
         .ok_or("E_EXECUTABLE_BINDING: chrono-harness missing from judge PATH")?;
     let path = entry
         .canonicalize()
@@ -41,4 +38,18 @@ pub(crate) fn bound_runner(
         ));
     }
     Ok(path)
+}
+
+/// Ask the kernel about execution for this process, including its effective
+/// identity and the filesystem's access-control policy.
+fn executable_for_judge(path: &Path) -> bool {
+    use std::{ffi::CString, os::unix::ffi::OsStrExt};
+    if !path.is_file() {
+        return false;
+    }
+    let Ok(name) = CString::new(path.as_os_str().as_bytes()) else {
+        return false;
+    };
+    // SAFETY: name is NUL-terminated and remains alive for the syscall.
+    unsafe { libc::faccessat(libc::AT_FDCWD, name.as_ptr(), libc::X_OK, libc::AT_EACCESS) == 0 }
 }
