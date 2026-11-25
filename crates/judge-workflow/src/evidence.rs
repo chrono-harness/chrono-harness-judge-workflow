@@ -16,13 +16,12 @@ pub fn output<'a>(req: &'a Request, key: &str) -> Result<&'a Value, String> {
         .iter()
         .filter_map(|r| r.outputs.get(key))
         .collect();
-    if values.is_empty()
-        || values.iter().any(|v| v.is_null())
-        || values.windows(2).any(|v| v[0] != v[1])
-    {
-        return Err(format!("E_WORKFLOW_INPUT: missing/conflicting {key}"));
-    }
-    Ok(values[0])
+    crate::verified_certificate::agreed_output(
+        &values,
+        |i| !values[i].is_null(),
+        |a, b| values[a] == values[b],
+    )
+    .ok_or_else(|| format!("E_WORKFLOW_INPUT: missing/conflicting {key}"))
 }
 pub fn process(req: &Request, p: &ProcessResult) -> Result<(), String> {
     req.evidence(json!({"operation":"check-process","process":p}))

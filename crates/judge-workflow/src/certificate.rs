@@ -88,10 +88,8 @@ fn report_output<'a>(report: &'a Value, key: &str) -> Result<&'a Value, String> 
         .iter()
         .filter_map(|j| j["response"]["outputs"].get(key))
         .collect();
-    if values.is_empty() || values.windows(2).any(|p| p[0] != p[1]) {
-        return Err(format!("missing/conflicting report {key}"));
-    }
-    Ok(values[0])
+    verified_certificate::agreed_output(&values, |_| true, |a, b| values[a] == values[b])
+        .ok_or_else(|| format!("missing/conflicting report {key}"))
 }
 pub fn consume(
     queries: &mut crate::registration::QueryFacts,
