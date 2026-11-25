@@ -2,7 +2,7 @@ use crate::facts;
 use crate::verified_branch::{self, SourceKind};
 use serde_json::{Value, json};
 use std::{collections::BTreeSet, path::Path};
-use time::{OffsetDateTime, UtcOffset, format_description::well_known::Rfc3339};
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 fn text<'a>(v: &'a Value, k: &str) -> Result<&'a str, String> {
     v[k].as_str()
         .filter(|s| !s.is_empty())
@@ -11,7 +11,7 @@ fn text<'a>(v: &'a Value, k: &str) -> Result<&'a str, String> {
 fn moment(v: &Value, k: &str) -> Result<OffsetDateTime, String> {
     let d = OffsetDateTime::parse(text(v, k)?, &Rfc3339)
         .map_err(|e| format!("E_BRANCH_CONTEXT: {k}: {e}"))?;
-    if d.offset() != UtcOffset::UTC {
+    if !verified_branch::is_utc_offset(d.offset().whole_seconds()) {
         return Err("E_BRANCH_CONTEXT: time must be UTC".into());
     }
     Ok(d)
@@ -52,18 +52,21 @@ pub fn current_observation_age(
         .parse()
         .map_err(|_| "E_BRANCH_CONTEXT: invalid current observation")?;
     let current = OffsetDateTime::from_unix_timestamp_nanos(nanos).map_err(|e| e.to_string())?;
-    if current < moment(ctx, "observed_at")? {
+    let original = moment(ctx, "observed_at")?;
+    if !verified_branch::current_observation_allowed(nanos, original.unix_timestamp_nanos()) {
         return Err("E_BRANCH_CONTEXT: current observation precedes original production".into());
     }
     age_at(ctx, w, current)
 }
 fn age_at(ctx: &Value, w: &Value, observed: OffsetDateTime) -> Result<time::Duration, String> {
     let age = observed - moment(ctx, "branch_started_at")?;
-    if age.is_negative() {
-        return Err("E_BRANCH_CONTEXT: negative age".into());
-    }
-    let age_ns = u64::try_from(age.whole_nanoseconds())
-        .map_err(|_| "E_BRANCH_CONTEXT: age exceeds supported range".to_string())?;
+    let age_ns = verified_branch::checked_age_ns(age.whole_nanoseconds()).map_err(|reason| {
+        match reason {
+            verified_branch::AgeError::Negative => "E_BRANCH_CONTEXT: negative age",
+            verified_branch::AgeError::OutOfRange => "E_BRANCH_CONTEXT: age exceeds supported range",
+        }
+        .to_string()
+    })?;
     let hours = w["staleness"]["max_age_hours"]
         .as_f64()
         .filter(|v| v.is_finite() && *v >= 0.0)
