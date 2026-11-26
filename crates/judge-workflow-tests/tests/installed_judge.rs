@@ -47,7 +47,7 @@ fn request_uses_the_first_executable_on_its_path_only_if_its_bytes_match() {
     fs::create_dir_all(&first).unwrap();
     fs::create_dir_all(&last).unwrap();
     let search = env::join_paths([Path::new("first"), &last]).unwrap();
-    let expected = format!("{:x}", Sha256::digest(b"release"));
+    let expected = hex::encode(Sha256::digest(b"release"));
     let resolve = || installed_judge::bound_runner(&root, &search, &expected);
     assert!(resolve().unwrap_err().contains("missing"));
     let release = last.join("chrono-harness");
@@ -66,7 +66,7 @@ fn request_uses_the_first_executable_on_its_path_only_if_its_bytes_match() {
     }
     fs::set_permissions(&earlier, fs::Permissions::from_mode(0o700)).unwrap();
     let err = resolve().unwrap_err();
-    assert!(err.contains(&format!("{:x}", Sha256::digest(b"older release"))));
+    assert!(err.contains(&hex::encode(Sha256::digest(b"older release"))));
     assert!(err.contains(&expected));
     fs::write(&earlier, b"release").unwrap();
     assert_eq!(resolve().unwrap(), earlier.canonicalize().unwrap());

@@ -7,7 +7,7 @@ use std::{cell::OnceCell, collections::BTreeMap, path::PathBuf};
 
 type Other = BTreeMap<String, Value>;
 pub fn sha256(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    hex::encode(Sha256::digest(bytes))
 }
 pub fn canonical<T: Serialize>(value: &T) -> Result<Vec<u8>, String> {
     serde_jcs::to_vec(value).map_err(|e| e.to_string())

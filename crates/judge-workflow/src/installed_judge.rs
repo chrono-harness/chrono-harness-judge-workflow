@@ -31,10 +31,10 @@ pub(crate) fn bound_runner(
         .map_err(|e| format!("E_EXECUTABLE_BINDING: {}: {e}", entry.display()))?;
     let mut file = fs::File::open(&path)
         .map_err(|e| format!("E_EXECUTABLE_BINDING: {}: {e}", path.display()))?;
-    let mut digest = Sha256::new();
+    let mut digest = digest_io::IoWrapper(Sha256::new());
     io::copy(&mut file, &mut digest)
         .map_err(|e| format!("E_EXECUTABLE_BINDING: {}: {e}", path.display()))?;
-    let actual = format!("{:x}", digest.finalize());
+    let actual = hex::encode(digest.0.finalize());
     crate::verified_evidence::bind_digest(path, &actual, expected).map_err(|path| {
         format!(
             "E_EXECUTABLE_BINDING: chrono-harness {} has sha256 {actual}, expected {expected}",
