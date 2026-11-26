@@ -1,7 +1,7 @@
 #![allow(unexpected_cfgs)]
-use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
 use super::policy::{self as verified_evidence, installed as installed_judge};
+use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
 use vstd::vpanic as panic;
 #[cfg(not(verus_keep_ghost))]
