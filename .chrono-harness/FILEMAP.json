@@ -494,7 +494,16 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/judge-workflow-tests/tests/observation_age.rs",
@@ -770,7 +779,20 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/judge-workflow/src/lib.rs",
@@ -1028,7 +1050,20 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence-tests"
+          }
+        ]
+      }
     },
     {
       "path": "docs/licenses/methodology-attribution.md",

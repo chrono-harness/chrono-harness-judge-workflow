@@ -7,6 +7,13 @@ use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
+#[cfg(verus_keep_ghost)]
+#[path = "installed_judge.rs"]
+pub mod installed;
+#[cfg(verus_keep_ghost)]
+#[path = "wire.rs"]
+pub mod wire;
+
 verus! {
 
 /// The JSON/process adapters may observe these facts, but this conjunction is
@@ -59,30 +66,6 @@ pub fn admit_record(
         && response_bytes
 }
 
-
-/// Stop at the first entry the operating system reports as executable.
-pub fn first_executable<F: Fn(usize) -> bool>(
-    count: usize, executable: F,
-) -> (first: Option<usize>)
-    requires forall|i: usize| i < count ==> executable.requires((i,)),
-    ensures match first {
-        None => forall|i: usize| i < count ==> executable.ensures((i,), false),
-        Some(index) => index < count && executable.ensures((index,), true)
-            && forall|i: usize| i < index ==> executable.ensures((i,), false),
-    },
-{
-    let mut i = 0;
-    while i < count
-        invariant i <= count,
-            forall|j: usize| j < count ==> executable.requires((j,)),
-            forall|j: usize| j < i ==> executable.ensures((j,), false),
-        decreases count - i,
-    {
-        if executable(i) { return Some(i); }
-        i += 1;
-    }
-    None
-}
 
 /// Preserve the selected identity on either outcome. The caller reads and
 /// hashes only this entry, so a rejected entry cannot fall through to another.
