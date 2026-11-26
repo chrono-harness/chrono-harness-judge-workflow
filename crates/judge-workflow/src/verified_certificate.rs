@@ -10,6 +10,38 @@ use vstd::contrib::exec_spec::ExecSpecEq;
 
 verus! {
 
+/// Wire order for the fields compared before reconstructing the producer's results.
+pub fn binding_fields() -> (fields: [&'static str; 8])
+    ensures fields[0]@ == "base"@, fields[1]@ == "candidate_tree"@,
+        fields[2]@ == "registry_digest"@, fields[3]@ == "executables"@,
+        fields[4]@ == "tools"@, fields[5]@ == "environment"@,
+        fields[6]@ == "effective_inputs"@, fields[7]@ == "required_tests"@,
+{
+    ["base", "candidate_tree", "registry_digest", "executables",
+     "tools", "environment", "effective_inputs", "required_tests"]
+}
+
+pub fn first_binding_mismatch<F: Fn(usize) -> bool>(matches: F) -> (first: Option<usize>)
+    requires forall|i: usize| i < 8 ==> matches.requires((i,)),
+    ensures match first {
+        Some(i) => i < 8 && matches.ensures((i,), false)
+            && forall|j: usize| j < i ==> matches.ensures((j,), true),
+        None => forall|i: usize| i < 8 ==> matches.ensures((i,), true),
+    },
+{
+    let mut i = 0usize;
+    while i < 8
+        invariant i <= 8,
+            forall|j: usize| j < 8 ==> matches.requires((j,)),
+            forall|j: usize| j < i ==> matches.ensures((j,), true),
+        decreases 8 - i,
+    {
+        if !matches(i) { return Some(i); }
+        i += 1;
+    }
+    None
+}
+
 /// Borrow the first producer's value when every observed output is admissible.
 pub fn agreed_output<'a, T, V: Fn(usize) -> bool, E: Fn(usize, usize) -> bool>(
     values: &[&'a T], valid: V, equal: E,
