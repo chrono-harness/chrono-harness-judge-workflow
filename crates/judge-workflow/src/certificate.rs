@@ -319,12 +319,12 @@ pub fn consume(
             let expanded: Value =
                 req.evidence(value!({"operation":"expand-record","record":old}))?;
             let old = &expanded;
-            let matches: Vec<_> = records.iter().filter(|v| v["id"] == old["id"]).collect();
-            if matches.len() != 1 {
-                return Err("producer judge observation missing/duplicate".into());
-            }
+            let index = verified_certificate::unique_record(records.len(), |i| {
+                records[i]["id"] == old["id"]
+            })
+            .ok_or("producer judge observation missing/duplicate")?;
             for (k, v) in old.as_object().ok_or("producer observation")? {
-                if matches[0][k] != *v {
+                if records[index][k] != *v {
                     return Err("producer observation changed".into());
                 }
             }
@@ -350,15 +350,18 @@ pub fn consume(
         if Value::Object(executable_map) != c["executables"] {
             return Err("producer executable observations differ".into());
         }
-        let own: Vec<_> = records
-            .iter()
-            .filter(|v| v["id"] == producer["judge"])
-            .collect();
-        if own.len() != 1
-            || own[0]["request_id"] != producer["request_id"]
-            || own[0]["response"]["outputs"]["workflow"]["mode"] != "integration_run"
-            || own[0]["response"]["outputs"]["workflow"]["integration"]["sha256"] != digest
-        {
+        let index = verified_certificate::unique_record(records.len(), |i| {
+            records[i]["id"] == producer["judge"]
+        })
+        .ok_or("producer workflow result differs")?;
+        let own = &records[index];
+        let workflow = &own["response"]["outputs"]["workflow"];
+        if !verified_certificate::producer_claim(
+            own["request_id"] == producer["request_id"],
+            workflow["mode"].as_str(),
+            workflow["integration"]["sha256"].as_str(),
+            digest,
+        ) {
             return Err("producer workflow result differs".into());
         }
         Ok(
