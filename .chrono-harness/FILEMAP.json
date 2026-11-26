@@ -54,6 +54,27 @@
       }
     },
     {
+      "path": ".chrono-harness/ci/host_adapters.rs",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": ".chrono-harness/ci/host_adapters.rs",
+            "operation": "verify.host-adapters"
+          }
+        ]
+      }
+    },
+    {
       "path": ".chrono-harness/ci/install.sh",
       "owner": "host",
       "surface": "product",
@@ -107,7 +128,16 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": ".chrono-harness/ci/host_adapters.rs",
+            "operation": "verify.host-adapters"
+          }
+        ]
+      }
     },
     {
       "path": ".chrono-harness/judges.json",
@@ -280,7 +310,16 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": ".chrono-harness/ci/host_adapters.rs",
+            "operation": "verify.host-adapters"
+          }
+        ]
+      }
     },
     {
       "path": ".config/mise/conf.d/selected-chrono-harness.toml",
@@ -292,28 +331,15 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
-    },
-    {
-      "path": ".github/workflows/dependabot-auto-merge.yml",
-      "owner": "host",
-      "surface": "product",
-      "cost": "unmeasured",
-      "edges": [],
+      ],
       "verification": {
-        "role": "data",
-        "roots": []
-      }
-    },
-    {
-      "path": ".github/dependabot.yml",
-      "owner": "host",
-      "surface": "product",
-      "cost": "unmeasured",
-      "edges": [],
-      "verification": {
-        "role": "data",
-        "roots": []
+        "role": "program",
+        "roots": [
+          {
+            "path": ".chrono-harness/ci/host_adapters.rs",
+            "operation": "verify.host-adapters"
+          }
+        ]
       }
     },
     {
@@ -372,6 +398,33 @@
       }
     },
     {
+      "path": ".github/dependabot.yml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
+    },
+    {
+      "path": ".github/workflows/actions.lock",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
+    },
+    {
       "path": ".github/workflows/check.yml",
       "owner": "host",
       "surface": "product",
@@ -381,7 +434,22 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
+    },
+    {
+      "path": ".github/workflows/dependabot-auto-merge.yml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".github/workflows/release.yml",
@@ -485,6 +553,27 @@
       }
     },
     {
+      "path": "crates/judge-workflow-tests/examples/release_observation.rs",
+      "owner": "judge-workflow-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_branch.rs",
+            "operation": "verify.judge-workflow-tests"
+          }
+        ]
+      }
+    },
+    {
       "path": "crates/judge-workflow-tests/tests/installed_judge.rs",
       "owner": "judge-workflow-tests",
       "surface": "test",
@@ -549,27 +638,6 @@
           "to": "test:judge-workflow-tests"
         }
       ]
-    },
-    {
-      "path": "crates/judge-workflow-tests/examples/release_observation.rs",
-      "owner": "judge-workflow-tests",
-      "surface": "test",
-      "cost": "unmeasured",
-      "edges": [
-        {
-          "kind": "test-execution",
-          "to": "test:judge-workflow-tests"
-        }
-      ],
-      "verification": {
-        "role": "program",
-        "roots": [
-          {
-            "path": "crates/judge-workflow-tests/tests/verified_branch.rs",
-            "operation": "verify.judge-workflow-tests"
-          }
-        ]
-      }
     },
     {
       "path": "crates/judge-workflow-tests/tests/verified_branch.rs",
@@ -1129,6 +1197,7 @@
         "verify.judge-workflow-certificate-tests",
         "verify.judge-workflow-transition-tests",
         "verify.judge-workflow-execution-tests",
+        "verify.host-adapters",
         "judge-workflow.owner-check"
       ],
       "timeout_seconds": 600,

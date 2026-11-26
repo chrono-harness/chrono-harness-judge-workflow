@@ -10,6 +10,7 @@ hex = "0.4"
 digest-io = "0.1"
 libc = "0.2"
 sha2 = "0.11"
+toml = { version = "1.2", default-features = false, features = ["parse", "serde", "std"] }
 serde_json = "1"
 vstd = "=0.0.0-2026-04-20-1748"
 chrono-judge-workflow = { path = "../judge-workflow" }
@@ -45,3 +46,7 @@ path = "tests/installed_judge.rs"
 [[test]]
 name = "retirement_report"
 path = "tests/retirement_report.rs"
+
+[[test]]
+name = "host_adapters"
+path = "../../.chrono-harness/ci/host_adapters.rs"
