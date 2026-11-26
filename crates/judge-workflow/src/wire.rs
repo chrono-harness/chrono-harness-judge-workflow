@@ -10,7 +10,7 @@ pub fn digest_canonical<E, F: Fn(Vec<u8>) -> String>(
     requires match bytes { Ok(b) => hash.requires((b,)), Err(_) => true },
     ensures match bytes {
         Ok(b) => match out { Ok(digest) => hash.ensures((b,), digest), Err(_) => false },
-        Err(error) => out == Err(error),
+        Err(error) => out == Err::<String, E>(error),
     },
 {
     match bytes { Ok(b) => Ok(hash(b)), Err(error) => Err(error) }
