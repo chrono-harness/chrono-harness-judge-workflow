@@ -21,7 +21,7 @@ mise run harness-setup
 
 本仓安装选择保存在 `.chrono-harness/template-answers.yml`，版本和平台校验值保存在 `.config/mise/conf.d/chrono-harness.toml`。
 
-本地完整检查报告的保留期限和定时维护入口见 [开发机检查原件](.chrono-harness/USAGE.md)。
+本地完整检查报告的保留期限和维护命令见 [开发机检查原件](.chrono-harness/USAGE.md)。
 
 ## 基础指令
 
