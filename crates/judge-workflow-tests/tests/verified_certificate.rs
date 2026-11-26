@@ -18,6 +18,23 @@ fn expect(condition: bool) requires condition {
 }
 
 /// The caller must learn which wire key failed first, including the last member.
+#[cfg(verus_keep_ghost)]
+fn delivery_requires_the_complete_producer_projection() {
+    broadcast use vstd::array::group_array_axioms;
+    let fields = policy::producer::producer_fields();
+    expect(<&str as vstd::contrib::exec_spec::ExecSpecEq>::exec_eq(fields[0], "branch_ref"));
+    expect(<&str as vstd::contrib::exec_spec::ExecSpecEq>::exec_eq(fields[1], "fork_point"));
+    expect(<&str as vstd::contrib::exec_spec::ExecSpecEq>::exec_eq(fields[2], "branch_started_at"));
+    expect(<&str as vstd::contrib::exec_spec::ExecSpecEq>::exec_eq(fields[3], "observed_at"));
+    let mismatch = |i: usize| -> (r: bool) ensures r == (i != 1 && i != 3), { i != 1 && i != 3 };
+    let first = policy::first_mismatch(4, mismatch);
+    proof {
+        if let Some(i) = first { if i > 1 { assert(mismatch.ensures((1usize,), true)); } }
+        else { assert(mismatch.ensures((1usize,), true)); }
+    }
+    expect(first == Some(1usize));
+}
+
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn delivery_compares_eight_wire_keys_in_certificate_order() {
     let fields = policy::binding_fields();
@@ -37,16 +54,16 @@ fn delivery_compares_eight_wire_keys_in_certificate_order() {
     assert(fields[7]@ == "required_tests"@);
 
     let same = |_i: usize| -> (r: bool) ensures r, { true };
-    expect(policy::first_binding_mismatch(same).is_none());
+    expect(policy::first_mismatch(8, same).is_none());
     let multiple = |i: usize| -> (r: bool) ensures r == (i != 2 && i != 5), { i != 2 && i != 5 };
-    let first = policy::first_binding_mismatch(multiple);
+    let first = policy::first_mismatch(8, multiple);
     proof {
         if let Some(i) = first { if i > 2 { assert(multiple.ensures((2usize,), true)); } }
         else { assert(multiple.ensures((2usize,), true)); }
     }
     expect(first == Some(2usize));
     let last = |i: usize| -> (r: bool) ensures r == (i != 7), { i != 7 };
-    let tail = policy::first_binding_mismatch(last);
+    let tail = policy::first_mismatch(8, last);
     proof { if tail.is_none() { assert(last.ensures((7usize,), true)); } }
     expect(tail == Some(7usize));
 }
