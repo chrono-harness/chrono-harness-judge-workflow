@@ -6,6 +6,8 @@ use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
+use vstd::contrib::exec_spec::ExecSpecEq;
+
 verus! {
 
 /// Borrow the first producer's value when every observed output is admissible.
@@ -39,6 +41,55 @@ pub fn agreed_output<'a, T, V: Fn(usize) -> bool, E: Fn(usize, usize) -> bool>(
         i += 1;
     }
     Some(values[0])
+}
+
+/// Select the exact row observed for one judge. Stop on the second match.
+pub fn unique_record<F: Fn(usize) -> bool>(count: usize, matches: F) -> (result: Option<usize>)
+    requires forall|i: usize| i < count ==> matches.requires((i,)),
+    ensures match result {
+        Some(index) => index < count && matches.ensures((index,), true)
+            && forall|i: usize| i < count && i != index ==> matches.ensures((i,), false),
+        None => (forall|i: usize| i < count ==> matches.ensures((i,), false))
+            || exists|a: usize, b: usize| a < b < count && matches.ensures((a,), true)
+                && matches.ensures((b,), true),
+    },
+{
+    let mut found: Option<usize> = None;
+    let mut i = 0usize;
+    while i < count
+        invariant i <= count,
+            forall|k: usize| k < count ==> matches.requires((k,)),
+            match found {
+                Some(index) => index < i && matches.ensures((index,), true)
+                    && forall|k: usize| k < i && k != index ==> matches.ensures((k,), false),
+                None => forall|k: usize| k < i ==> matches.ensures((k,), false),
+            },
+        decreases count - i,
+    {
+        if matches(i) {
+            if let Some(previous) = found {
+                proof { assert(previous < i && matches.ensures((previous,), true)); }
+                return None;
+            }
+            found = Some(i);
+        }
+        i += 1;
+    }
+    found
+}
+
+/// Bind the fields from the selected row to the retained producer and certificate.
+pub fn producer_claim(request_matches: bool, mode: Option<&str>, claim: Option<&str>, digest: &str)
+    -> (admitted: bool)
+    ensures admitted == (request_matches
+        && mode.is_some() && mode.unwrap()@ == "integration_run"@
+        && claim.is_some() && claim.unwrap()@ == digest@),
+{
+    match (mode, claim) {
+        (Some(mode), Some(claim)) => request_matches
+            && <&str>::exec_eq(mode, "integration_run") && <&str>::exec_eq(claim, digest),
+        _ => false,
+    }
 }
 
 /// A certificate binding is admissible only when its cardinality and exact
