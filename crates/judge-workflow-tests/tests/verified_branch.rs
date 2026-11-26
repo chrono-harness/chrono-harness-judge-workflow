@@ -2,12 +2,36 @@
 #![allow(unexpected_cfgs)]
 #[path = "../../judge-workflow/src/verified_branch.rs"]
 mod policy;
+#[path = "../examples/release_observation.rs"]
+mod release_observation;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
 verus! {
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn publishing_requires_the_original_missing_timestamp_diagnostic_and_error_exit() {
+    proof {
+        reveal_strlit("0"); reveal_strlit("2");
+        reveal_strlit("E_BRANCH_CONTEXT: missing observed_at");
+        reveal_strlit("E_BRANCH_CONTEXT: missing branch_started_at");
+        reveal_strlit("E_BRANCH_CONTEXT:");
+        assert("0"@[0] != "2"@[0]);
+        assert("E_BRANCH_CONTEXT: missing branch_started_at"@.len() != "E_BRANCH_CONTEXT: missing observed_at"@.len());
+        assert("E_BRANCH_CONTEXT:"@.len() != "E_BRANCH_CONTEXT: missing observed_at"@.len());
+    }
+    let accepted = release_observation::accepts("2", "E_BRANCH_CONTEXT: missing observed_at");
+    let wrong_exit = release_observation::accepts("0", "E_BRANCH_CONTEXT: missing observed_at");
+    let wrong_error = release_observation::accepts("2", "E_BRANCH_CONTEXT: missing branch_started_at");
+    let truncated = release_observation::accepts("2", "E_BRANCH_CONTEXT:");
+    assert(accepted);
+    assert(!wrong_exit);
+    assert(!wrong_error);
+    assert(!truncated);
+}
+
 
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn exactly_one_prefix_selects_feature_or_integration() {

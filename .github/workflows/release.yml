@@ -56,8 +56,8 @@ jobs:
           "$binary" check-observation-age <<< "$request"
           code=0
           "$binary" check-observation-age <<< '{}' 2>"$RUNNER_TEMP/observation-error" || code=$?
-          test "$code" = 2
-          test "$(cat "$RUNNER_TEMP/observation-error")" = 'E_BRANCH_CONTEXT: missing observed_at'
+          cargo run --quiet --locked --release --manifest-path crates/judge-workflow-tests/Cargo.toml \
+            --example release_observation -- "$code" "$(cat "$RUNNER_TEMP/observation-error")"
           mkdir "$RUNNER_TEMP/dist"
           cp "$CARGO_TARGET_DIR/release/chrono-judge-workflow" "$RUNNER_TEMP/dist/chrono-judge-workflow-$PLATFORM"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

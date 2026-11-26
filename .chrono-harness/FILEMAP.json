@@ -362,7 +362,16 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".gitignore",
@@ -497,6 +506,27 @@
           "to": "test:judge-workflow-tests"
         }
       ]
+    },
+    {
+      "path": "crates/judge-workflow-tests/examples/release_observation.rs",
+      "owner": "judge-workflow-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:judge-workflow-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_branch.rs",
+            "operation": "verify.judge-workflow-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/judge-workflow-tests/tests/verified_branch.rs",
