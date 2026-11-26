@@ -436,7 +436,11 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "crates/judge-workflow-tests/Cargo.toml",
@@ -643,7 +647,11 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "crates/judge-workflow/Cargo.toml",
@@ -655,7 +663,11 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "crates/judge-workflow/src/branch.rs",
@@ -679,7 +691,20 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_certificate.rs",
+            "operation": "verify.judge-workflow-certificate"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_certificate.rs",
+            "operation": "verify.judge-workflow-certificate-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/judge-workflow/src/evidence.rs",

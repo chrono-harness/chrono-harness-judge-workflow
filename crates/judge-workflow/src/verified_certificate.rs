@@ -8,6 +8,10 @@ use vstd::prelude::*;
 
 use vstd::contrib::exec_spec::ExecSpecEq;
 
+#[cfg(verus_keep_ghost)]
+#[path = "certificate.rs"]
+pub mod producer;
+
 verus! {
 
 /// Wire order for the fields compared before reconstructing the producer's results.
@@ -21,20 +25,20 @@ pub fn binding_fields() -> (fields: [&'static str; 8])
      "tools", "environment", "effective_inputs", "required_tests"]
 }
 
-pub fn first_binding_mismatch<F: Fn(usize) -> bool>(matches: F) -> (first: Option<usize>)
-    requires forall|i: usize| i < 8 ==> matches.requires((i,)),
+pub fn first_mismatch<F: Fn(usize) -> bool>(count: usize, matches: F) -> (first: Option<usize>)
+    requires forall|i: usize| i < count ==> matches.requires((i,)),
     ensures match first {
-        Some(i) => i < 8 && matches.ensures((i,), false)
+        Some(i) => i < count && matches.ensures((i,), false)
             && forall|j: usize| j < i ==> matches.ensures((j,), true),
-        None => forall|i: usize| i < 8 ==> matches.ensures((i,), true),
+        None => forall|i: usize| i < count ==> matches.ensures((i,), true),
     },
 {
     let mut i = 0usize;
-    while i < 8
-        invariant i <= 8,
-            forall|j: usize| j < 8 ==> matches.requires((j,)),
+    while i < count
+        invariant i <= count,
+            forall|j: usize| j < count ==> matches.requires((j,)),
             forall|j: usize| j < i ==> matches.ensures((j,), true),
-        decreases 8 - i,
+        decreases count - i,
     {
         if !matches(i) { return Some(i); }
         i += 1;

@@ -1,10 +1,35 @@
+//! Producer branch metadata shared by the integration writer and delivery reader.
+#![allow(unexpected_cfgs)]
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
+#[cfg(verus_keep_ghost)]
+use vstd::prelude::*;
+
+verus! {
+/// Compare the retained projection in the same order that the writer copies it.
+pub fn producer_fields() -> (fields: [&'static str; 4])
+    ensures fields[0]@ == "branch_ref"@, fields[1]@ == "fork_point"@,
+        fields[2]@ == "branch_started_at"@, fields[3]@ == "observed_at"@,
+{
+    ["branch_ref", "fork_point", "branch_started_at", "observed_at"]
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::projects::{self, ProjectEvidence};
+#[cfg(not(verus_keep_ghost))]
 use crate::registration::Registry;
+#[cfg(not(verus_keep_ghost))]
 use crate::routes::{self, Execution};
+#[cfg(not(verus_keep_ghost))]
 use crate::wire::{self, Request, sha256};
+#[cfg(not(verus_keep_ghost))]
 use crate::{evidence, verified_certificate};
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json as value};
+#[cfg(not(verus_keep_ghost))]
 use std::{collections::BTreeSet, fs, path::Path};
+#[cfg(not(verus_keep_ghost))]
 fn location(req: &Request, r: &Registry) -> Result<std::path::PathBuf, String> {
     let path = r.workflow["integration"]["evidence"]
         .as_str()
@@ -14,6 +39,7 @@ fn location(req: &Request, r: &Registry) -> Result<std::path::PathBuf, String> {
     }
     req.artifact(value!({"operation":"checked-path","path":path}))
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn validate_bind(r: &Registry) -> Result<(), String> {
     let keys = r.workflow["integration"]["bind"].as_array().unwrap();
     let supplied: BTreeSet<_> = keys.iter().filter_map(Value::as_str).collect();
@@ -30,6 +56,7 @@ pub fn validate_bind(r: &Registry) -> Result<(), String> {
     }
     Ok(())
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn produce(
     req: &Request,
     r: &Registry,
@@ -46,12 +73,7 @@ pub fn produce(
     binding["schema_version"] = 1.into();
     binding["status"] = "passed".into();
     binding["results_digest"] = wire::digest(&results.wire)?.into();
-    for k in [
-        "branch_ref",
-        "fork_point",
-        "branch_started_at",
-        "observed_at",
-    ] {
+    for k in producer_fields() {
         binding[k] = ctx[k].clone();
     }
     binding["producer"] = value!({"judge":req.judge_id,"request_id":req.request_id,"candidate":req.candidate.commit,"root":req.candidate.root,"report_path":report,"context_digest":req.context.sha256});
@@ -71,6 +93,7 @@ pub fn produce(
         value!({"sha256":sha256(&bytes),"path":r.workflow["integration"]["evidence"],"producer_report":report,"validation_scope":"declared inputs; complete runtime closure remains a separate obligation"}),
     )
 }
+#[cfg(not(verus_keep_ghost))]
 fn report_output<'a>(report: &'a Value, key: &str) -> Result<&'a Value, String> {
     let values: Vec<_> = report["judges"]
         .as_array()
@@ -81,6 +104,7 @@ fn report_output<'a>(report: &'a Value, key: &str) -> Result<&'a Value, String> 
     verified_certificate::agreed_output(&values, |_| true, |a, b| values[a] == values[b])
         .ok_or_else(|| format!("missing/conflicting report {key}"))
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn consume(
     queries: &mut crate::registration::QueryFacts,
     reader: &crate::facts::Reader,
@@ -110,7 +134,7 @@ pub fn consume(
             return Err("certificate did not succeed".into());
         }
         let fields = verified_certificate::binding_fields();
-        if let Some(index) = verified_certificate::first_binding_mismatch(|i| {
+        if let Some(index) = verified_certificate::first_mismatch(fields.len(), |i| {
             let field = fields[i];
             c[field] == binding[field]
         }) {
@@ -132,15 +156,12 @@ pub fn consume(
         {
             return Err("producer context differs".into());
         }
-        for k in [
-            "branch_ref",
-            "fork_point",
-            "branch_started_at",
-            "observed_at",
-        ] {
-            if c[k] != old_ctx[k] {
-                return Err(format!("producer {k} differs"));
-            }
+        let fields = producer_fields();
+        if let Some(index) = verified_certificate::first_mismatch(fields.len(), |i| {
+            let field = fields[i];
+            c[field] == old_ctx[field]
+        }) {
+            return Err(format!("producer {} differs", fields[index]));
         }
         // Evidence must still be fresh at this observation, not only at its original run.
         let timestamp = |v: &Value| {
