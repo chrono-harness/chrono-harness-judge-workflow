@@ -17,6 +17,40 @@ fn expect(condition: bool) requires condition {
     if !condition { panic!(); }
 }
 
+/// The caller must learn which wire key failed first, including the last member.
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn delivery_compares_eight_wire_keys_in_certificate_order() {
+    let fields = policy::binding_fields();
+    proof {
+        reveal_strlit("base"); reveal_strlit("candidate_tree");
+        reveal_strlit("registry_digest"); reveal_strlit("executables");
+        reveal_strlit("tools"); reveal_strlit("environment");
+        reveal_strlit("effective_inputs"); reveal_strlit("required_tests");
+    }
+    assert(fields[0]@ == "base"@);
+    assert(fields[1]@ == "candidate_tree"@);
+    assert(fields[2]@ == "registry_digest"@);
+    assert(fields[3]@ == "executables"@);
+    assert(fields[4]@ == "tools"@);
+    assert(fields[5]@ == "environment"@);
+    assert(fields[6]@ == "effective_inputs"@);
+    assert(fields[7]@ == "required_tests"@);
+
+    let same = |_i: usize| -> (r: bool) ensures r, { true };
+    expect(policy::first_binding_mismatch(same).is_none());
+    let multiple = |i: usize| -> (r: bool) ensures r == (i != 2 && i != 5), { i != 2 && i != 5 };
+    let first = policy::first_binding_mismatch(multiple);
+    proof {
+        if let Some(i) = first { if i > 2 { assert(multiple.ensures((2usize,), true)); } }
+        else { assert(multiple.ensures((2usize,), true)); }
+    }
+    expect(first == Some(2usize));
+    let last = |i: usize| -> (r: bool) ensures r == (i != 7), { i != 7 };
+    let tail = policy::first_binding_mismatch(last);
+    proof { if tail.is_none() { assert(last.ensures((7usize,), true)); } }
+    expect(tail == Some(7usize));
+}
+
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn output_requires_an_admitted_first_value_and_all_later_matches() {
     let first = 17u8;

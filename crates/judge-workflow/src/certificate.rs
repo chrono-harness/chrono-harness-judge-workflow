@@ -5,17 +5,6 @@ use crate::wire::{self, Request, sha256};
 use crate::{evidence, verified_certificate};
 use serde_json::{Value, json as value};
 use std::{collections::BTreeSet, fs, path::Path};
-const FIELDS: [&str; 9] = [
-    "base",
-    "candidate_tree",
-    "registry_digest",
-    "executables",
-    "tools",
-    "environment",
-    "effective_inputs",
-    "required_tests",
-    "results_digest",
-];
 fn location(req: &Request, r: &Registry) -> Result<std::path::PathBuf, String> {
     let path = r.workflow["integration"]["evidence"]
         .as_str()
@@ -28,9 +17,10 @@ fn location(req: &Request, r: &Registry) -> Result<std::path::PathBuf, String> {
 pub fn validate_bind(r: &Registry) -> Result<(), String> {
     let keys = r.workflow["integration"]["bind"].as_array().unwrap();
     let supplied: BTreeSet<_> = keys.iter().filter_map(Value::as_str).collect();
+    let fields = verified_certificate::binding_fields();
     let admitted = verified_certificate::admit_binding(
-        keys.len() == FIELDS.len(),
-        supplied == FIELDS.into_iter().collect(),
+        keys.len() == fields.len() + 1,
+        supplied == fields.into_iter().chain(["results_digest"]).collect(),
     );
     if !admitted {
         return Err(
@@ -119,10 +109,12 @@ pub fn consume(
         if c["schema_version"] != 1 || c["status"] != "passed" {
             return Err("certificate did not succeed".into());
         }
-        for field in FIELDS.into_iter().filter(|k| *k != "results_digest") {
-            if c[field] != binding[field] {
-                return Err(format!("different binding {field}"));
-            }
+        let fields = verified_certificate::binding_fields();
+        if let Some(index) = verified_certificate::first_binding_mismatch(|i| {
+            let field = fields[i];
+            c[field] == binding[field]
+        }) {
+            return Err(format!("different binding {}", fields[index]));
         }
         let proof = &c["proof"];
         let producer = &c["producer"];
