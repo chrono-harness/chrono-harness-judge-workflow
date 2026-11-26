@@ -1,37 +1,68 @@
 //! Fields consumed by workflow. Extra registered fields travel unchanged in replayed originals.
+#![allow(unexpected_cfgs)]
+use vstd::prelude::*;
+
+verus! {
+/// Hash precisely the canonical bytes, preserving the serializer's error.
+pub fn digest_canonical<E, F: Fn(Vec<u8>) -> String>(
+    bytes: Result<Vec<u8>, E>, hash: F,
+) -> (out: Result<String, E>)
+    requires match bytes { Ok(b) => hash.requires((b,)), Err(_) => true },
+    ensures match bytes {
+        Ok(b) => match out { Ok(digest) => hash.ensures((b,), digest), Err(_) => false },
+        Err(error) => out == Err(error),
+    },
+{
+    match bytes { Ok(b) => Ok(hash(b)), Err(error) => Err(error) }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::session::Connection;
+#[cfg(not(verus_keep_ghost))]
 use serde::{Deserialize, Serialize};
+#[cfg(not(verus_keep_ghost))]
 use serde_json::Value;
+#[cfg(not(verus_keep_ghost))]
 use sha2::{Digest, Sha256};
+#[cfg(not(verus_keep_ghost))]
 use std::{cell::OnceCell, collections::BTreeMap, path::PathBuf};
 
+#[cfg(not(verus_keep_ghost))]
 type Other = BTreeMap<String, Value>;
+#[cfg(not(verus_keep_ghost))]
 pub fn sha256(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn canonical<T: Serialize>(value: &T) -> Result<Vec<u8>, String> {
     serde_jcs::to_vec(value).map_err(|e| e.to_string())
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn digest<T: Serialize>(value: &T) -> Result<String, String> {
-    Ok(sha256(&canonical(value)?))
+    digest_canonical(canonical(value), |bytes| sha256(&bytes))
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize, Serialize)]
 pub struct Endpoint {
     pub commit: String,
     pub tree: String,
     pub root: PathBuf,
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize, Serialize)]
 pub struct Registries {
     pub digest: String,
     #[serde(flatten)]
     other: Other,
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize, Serialize)]
 pub struct Original {
     pub path: PathBuf,
     pub sha256: String,
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize, Serialize)]
 pub struct Program {
     pub path: String,
@@ -39,12 +70,14 @@ pub struct Program {
     #[serde(flatten)]
     other: Other,
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum Scope {
     Unit { unit: String },
     Collect { manifest: String },
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize, Serialize)]
 pub struct Request {
     pub base: Endpoint,
@@ -70,6 +103,7 @@ pub struct Request {
     #[serde(skip)]
     evidence: OnceCell<Result<Connection, String>>,
 }
+#[cfg(not(verus_keep_ghost))]
 impl Request {
     pub fn runner_path(&self) -> Result<&std::path::Path, String> {
         self.bound_runner
@@ -126,6 +160,7 @@ impl Request {
         Ok(())
     }
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone, Deserialize, Serialize, PartialOrd, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Status {
@@ -134,6 +169,7 @@ pub enum Status {
     Fail,
     Error,
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize, Serialize)]
 pub struct Response {
     pub judge_id: String,
@@ -143,6 +179,7 @@ pub struct Response {
     #[serde(flatten)]
     other: Other,
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize, Serialize)]
 pub struct Process {
     pub argv: Vec<String>,
@@ -157,6 +194,7 @@ pub struct Process {
     #[serde(flatten)]
     other: Other,
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize, Serialize)]
 pub struct Tool {
     pub program: String,

@@ -1,10 +1,18 @@
+#![allow(unexpected_cfgs)]
+use vstd::prelude::*;
+#[cfg(verus_keep_ghost)]
+use super::policy::{self as verified_evidence, installed as installed_judge};
+#[cfg(verus_keep_ghost)]
+use vstd::vpanic as panic;
+#[cfg(not(verus_keep_ghost))]
 #[path = "../../judge-workflow/src/installed_judge.rs"]
 mod installed_judge;
+#[cfg(not(verus_keep_ghost))]
 #[allow(dead_code)]
 #[path = "../../judge-workflow/src/verified_evidence.rs"]
 mod verified_evidence;
 
-#[cfg(unix)]
+#[cfg(all(unix, not(verus_keep_ghost)))]
 #[test]
 fn registered_installation_link_must_resolve_to_the_observed_executable() {
     use std::fs;
@@ -31,7 +39,7 @@ fn registered_installation_link_must_resolve_to_the_observed_executable() {
     fs::remove_dir_all(scratch).unwrap();
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(verus_keep_ghost)))]
 #[test]
 fn request_uses_the_first_executable_on_its_path_only_if_its_bytes_match() {
     use sha2::{Digest, Sha256};
@@ -74,4 +82,39 @@ fn request_uses_the_first_executable_on_its_path_only_if_its_bytes_match() {
     symlink(&release, &earlier).unwrap();
     assert_eq!(resolve().unwrap(), release.canonicalize().unwrap());
     fs::remove_dir_all(root).unwrap();
+}
+
+verus! {
+fn expect(value: bool) requires value { if !value { panic!(); } }
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn path_order_stops_at_the_first_executable_and_checks_its_digest() {
+    let available = |i: usize| -> (result: bool)
+        ensures result == (i == 1 || i == 2), { i == 1 || i == 2 };
+    expect(installed_judge::first_executable(0, available).is_none());
+    expect(installed_judge::first_executable(1, available).is_none());
+    let first = match installed_judge::first_executable(3, available) {
+        Some(i) => {
+            proof { if i == 2 { assert(available.ensures((1usize,), false)); } }
+            expect(i == 1);
+            i
+        },
+        None => {
+            proof { assert(available.ensures((1usize,), false)); }
+            expect(false);
+            return;
+        },
+    };
+    proof { reveal_strlit("aa"); reveal_strlit("ab"); assert("aa"@[1] != "ab"@[1]); }
+    let digest = if first == 1 { "aa" } else { "ab" };
+    match verified_evidence::bind_digest(first, digest, "ab") {
+        Err(i) => expect(i == 1),
+        Ok(_) => expect(false),
+    }
+    match verified_evidence::bind_digest(first, digest, "aa") {
+        Ok(i) => expect(i == 1),
+        Err(_) => expect(false),
+    }
+}
+
 }
