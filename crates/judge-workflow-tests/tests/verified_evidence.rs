@@ -13,7 +13,22 @@ use vstd::prelude::*;
 #[path = "installed_judge.rs"]
 mod installed;
 
+#[cfg(verus_keep_ghost)]
+use policy::evidence::{InputIdentity, input_identity};
+
 verus! {
+#[cfg(verus_keep_ghost)]
+fn effective_input_markers_select_only_their_own_digest() {
+    let mode = input_identity(false,false);
+    assert(matches!(mode,Some(InputIdentity::Endpoints)));
+    let mode = input_identity(false,true);
+    assert(matches!(mode,Some(InputIdentity::Endpoints)));
+    let mode = input_identity(true,true);
+    assert(matches!(mode,Some(InputIdentity::SchemaAndEndpoints)));
+    let mode = input_identity(true,false);
+    assert(matches!(mode,None));
+}
+
 
 
 

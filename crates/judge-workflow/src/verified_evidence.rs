@@ -14,6 +14,10 @@ pub mod installed;
 #[path = "wire.rs"]
 pub mod wire;
 
+#[cfg(verus_keep_ghost)]
+#[path = "evidence.rs"]
+pub mod evidence;
+
 verus! {
 
 /// The JSON/process adapters may observe these facts, but this conjunction is

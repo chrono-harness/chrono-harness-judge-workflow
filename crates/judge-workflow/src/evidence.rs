@@ -1,15 +1,44 @@
+#![allow(unexpected_cfgs)]
+use vstd::prelude::*;
+
+verus! {
+#[derive(Copy, Clone)]
+pub enum InputIdentity { Endpoints, SchemaAndEndpoints }
+
+pub fn input_identity(present: bool, recognized: bool) -> (mode: Option<InputIdentity>)
+    ensures match mode {
+        Some(InputIdentity::Endpoints) => !present,
+        Some(InputIdentity::SchemaAndEndpoints) => present && recognized,
+        None => present && !recognized,
+    },
+{
+    if !present { Some(InputIdentity::Endpoints) }
+    else if recognized { Some(InputIdentity::SchemaAndEndpoints) }
+    else { None }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::projects::{self, ProjectEvidence};
+#[cfg(not(verus_keep_ghost))]
 use crate::registration::Registry;
+#[cfg(not(verus_keep_ghost))]
 use crate::routes::{self, Execution};
+#[cfg(not(verus_keep_ghost))]
 use crate::verified_evidence;
+#[cfg(not(verus_keep_ghost))]
 use crate::verified_execution;
+#[cfg(not(verus_keep_ghost))]
 use crate::wire::{self, Process as ProcessResult, Request, Response, Scope, Status, sha256};
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
 };
 
+#[cfg(not(verus_keep_ghost))]
 pub fn output<'a>(req: &'a Request, key: &str) -> Result<&'a Value, String> {
     let values: Vec<_> = req
         .prior_results
@@ -23,9 +52,11 @@ pub fn output<'a>(req: &'a Request, key: &str) -> Result<&'a Value, String> {
     )
     .ok_or_else(|| format!("E_WORKFLOW_INPUT: missing/conflicting {key}"))
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn process(req: &Request, p: &ProcessResult) -> Result<(), String> {
     req.evidence(json!({"operation":"check-process","process":p}))
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn record(req: &Request, v: &Value) -> Result<(Response, ProcessResult), String> {
     #[derive(serde::Deserialize)]
     struct Observed {
@@ -57,6 +88,7 @@ pub fn record(req: &Request, v: &Value) -> Result<(Response, ProcessResult), Str
     }
     Ok((r, p))
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn execution(
     req: &Request,
     registry: &Registry,
@@ -65,6 +97,7 @@ pub fn execution(
 ) -> Result<(), String> {
     execution_inner(req, registry, plan, evidence, false)
 }
+#[cfg(not(verus_keep_ghost))]
 fn execution_inner(
     req: &Request,
     registry: &Registry,
@@ -179,11 +212,13 @@ fn execution_inner(
     }
     Ok(())
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn relative(root: &Path, path: &Path) -> String {
     path.strip_prefix(root)
         .map(|p| format!("host:{}", p.display()))
         .unwrap_or_else(|_| format!("external:{}", path.display()))
 }
+#[cfg(not(verus_keep_ghost))]
 fn tools(req: &Request, plan: &Execution) -> Result<Value, String> {
     let mut out = BTreeMap::new();
     for (id, t) in &plan.tools {
@@ -200,6 +235,7 @@ fn tools(req: &Request, plan: &Execution) -> Result<Value, String> {
     }
     Ok(json!(out))
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn inputs(
     v: &Value,
     base: &str,
@@ -207,10 +243,22 @@ pub fn inputs(
     tree: &str,
     root: &Path,
 ) -> Result<Value, String> {
+    const EXACT: &str = "chrono-effective-input-identity/v2";
+    let marker = v.get("identity_schema");
+    let digest = match input_identity(
+        marker.is_some(),
+        marker.and_then(Value::as_str) == Some(EXACT),
+    ) {
+        Some(InputIdentity::Endpoints) => wire::digest(&v["endpoints"])?,
+        Some(InputIdentity::SchemaAndEndpoints) => {
+            wire::digest(&(EXACT, &v["schema"], &v["endpoints"]))?
+        }
+        None => return Err("E_WORKFLOW_INPUT: unknown effective input identity schema".into()),
+    };
     if !matches!(
         v["schema"].as_str(),
         Some("chrono-effective-inputs/v1" | "chrono-effective-inputs/v2")
-    ) || v["identity"] != wire::digest(&v["endpoints"])?
+    ) || v["identity"] != digest
         || v["endpoints"]["base"]["commit"] != base
         || v["endpoints"]["candidate"]["commit"] != candidate
     {
@@ -240,6 +288,7 @@ pub fn inputs(
     }
     Ok(e)
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn binding(
     req: &Request,
     r: &Registry,
