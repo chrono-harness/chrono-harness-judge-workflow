@@ -16,6 +16,36 @@ use vstd::vpanic as panic;
 verus! {
 
 #[cfg(verus_keep_ghost)]
+fn command_arity_and_run_kind_are_checked_at_the_public_entry() {
+    use policy::commands::Command;
+    use policy::workflow::RunKind;
+    let version = policy::commands::select_command(Some("--version"), 1);
+    let version_with_args = policy::commands::select_command(Some("--version"), 2);
+    let age = policy::commands::select_command(Some("check-observation-age"), 1);
+    let extra = policy::commands::select_command(Some("check-observation-age"), 2);
+    let evaluation = policy::commands::select_command(Some("evaluate-workflow-v1"), 1);
+    let rest = policy::commands::select_command(None, 1);
+    let delegated = policy::commands::select_command(Some("evaluate-workflow-v1"), 2);
+    let integration = policy::workflow::run_kind(Some("integration"), true);
+    let wrong_branch = policy::workflow::run_kind(Some("integration"), false);
+    let delivery = policy::workflow::run_kind(Some("delivery"), false);
+    let absent = policy::workflow::run_kind(None, true);
+    proof {
+        reveal_strlit("--version"); reveal_strlit("check-observation-age");
+        reveal_strlit("evaluate-workflow-v1"); reveal_strlit("integration"); reveal_strlit("delivery");
+        assert("--version"@[0] != "check-observation-age"@[0]);
+        assert("--version"@[0] != "evaluate-workflow-v1"@[0]);
+        assert("check-observation-age"@[0] != "evaluate-workflow-v1"@[0]);
+        assert("integration"@[0] != "delivery"@[0]);
+    }
+    assert(version is Version && version_with_args is Delegate && age is Age && extra is Usage);
+    assert(evaluation is Evaluate && rest is Delegate && delegated is Delegate);
+    assert(integration is Some && integration.unwrap() is Integration && wrong_branch is None);
+    assert(delivery is Some && delivery.unwrap() is Delivery && absent is None);
+}
+
+
+#[cfg(verus_keep_ghost)]
 fn freshness_failure_copy_follows_original_exit(exit_code: i32) {
     let retain = freshness::initial_check_needs_failure_copy(exit_code);
     if exit_code == 0 { assert(!retain); }

@@ -18,6 +18,25 @@ pub mod wire;
 #[path = "evidence.rs"]
 pub mod evidence;
 
+#[cfg(verus_keep_ghost)]
+#[path = "facts.rs"]
+pub mod facts;
+#[cfg(verus_keep_ghost)]
+#[path = "projects.rs"]
+pub mod projects;
+#[cfg(verus_keep_ghost)]
+#[path = "query.rs"]
+pub mod query;
+#[cfg(verus_keep_ghost)]
+#[path = "registration.rs"]
+pub mod registration;
+#[cfg(verus_keep_ghost)]
+#[path = "routes.rs"]
+pub mod routes;
+#[cfg(verus_keep_ghost)]
+#[path = "session.rs"]
+pub mod session;
+
 verus! {
 
 /// The JSON/process adapters may observe these facts, but this conjunction is

@@ -1,13 +1,66 @@
+#![allow(unexpected_cfgs)]
+use vstd::prelude::*;
+
+verus! {
+pub enum CommandReply<'a> { Success(&'a [u8]), Rejected(&'a [u8]) }
+
+pub fn selected_stream<'a>(exit: i32, stdout: &'a [u8], stderr: &'a [u8]) -> (stream: CommandReply<'a>)
+    ensures stream == if exit == 0 { CommandReply::Success(stdout) } else { CommandReply::Rejected(stderr) },
+{
+    if exit == 0 { CommandReply::Success(stdout) } else { CommandReply::Rejected(stderr) }
+}
+
+/// Locate the first protocol separator. Payload bytes may contain further newlines.
+pub fn header_end(frame: &[u8]) -> (end: Option<usize>)
+    ensures match end {
+        Some(i) => i < frame.len() && frame@[i as int] == 10u8
+            && forall|j: int| 0 <= j < i ==> frame@[j] != 10u8,
+        None => forall|j: int| 0 <= j < frame.len() ==> frame@[j] != 10u8,
+    },
+{
+    for i in 0..frame.len()
+        invariant forall|j: int| 0 <= j < i ==> frame@[j] != 10u8,
+    {
+        if frame[i] == 10 { return Some(i); }
+    }
+    None
+}
+
+/// Admit two complete, individually bounded streams and return the original slices.
+pub fn split_payload<'a>(data: &'a [u8], stdout: usize, stderr: usize, limit: usize)
+    -> (out: Option<(&'a [u8], &'a [u8])>)
+    ensures out.is_some() == (stdout <= limit && stderr <= limit
+        && stdout as int + stderr as int == data.len() as int),
+        match out {
+            Some((first,last)) => first@ == data@.take(stdout as int)
+                && last@ == data@.skip(stdout as int),
+            None => true,
+        },
+{
+    if stdout > limit || stderr > limit || stdout > data.len() || stderr != data.len() - stdout {
+        return None;
+    }
+    Some(data.split_at(stdout))
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::registration::Registry;
+#[cfg(not(verus_keep_ghost))]
 use crate::wire::Request;
+#[cfg(not(verus_keep_ghost))]
 use serde::Deserialize;
+#[cfg(not(verus_keep_ghost))]
 use serde_json::Value;
+#[cfg(not(verus_keep_ghost))]
 use serde_json::json;
+#[cfg(not(verus_keep_ghost))]
 use std::{
     io::Write,
     process::{Command, Stdio},
 };
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn invoke(
     req: &Request,
     registry: &Registry,
@@ -25,6 +78,7 @@ pub(crate) fn invoke(
     )
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn run(
     req: &Request,
     config: &Value,
@@ -101,6 +155,18 @@ pub(crate) fn run(
     })();
     drop(input);
     let output = child.wait_with_output().map_err(|e| e.to_string())?;
+    decode_query_result(&name, command, limit, written, output)
+}
+
+/// Decode the runner's outer status and its complete delegated command result.
+#[cfg(not(verus_keep_ghost))]
+pub fn decode_query_result(
+    name: &str,
+    command: &str,
+    limit: usize,
+    written: Result<(), String>,
+    output: std::process::Output,
+) -> Result<Vec<u8>, String> {
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr)
             .trim_end_matches('\n')
@@ -113,28 +179,21 @@ pub(crate) fn run(
         stdout_length: usize,
         stderr_length: usize,
     }
-    let end = output
-        .stdout
-        .iter()
-        .position(|b| *b == b'\n')
-        .ok_or("missing command result header")?;
+    let end = header_end(&output.stdout).ok_or("missing command result header")?;
     let lengths: Lengths =
         serde_json::from_slice(&output.stdout[..end]).map_err(|e| e.to_string())?;
     let data = &output.stdout[end + 1..];
-    if lengths.stdout_length > limit
-        || lengths.stderr_length > limit
-        || lengths.stdout_length.checked_add(lengths.stderr_length) != Some(data.len())
-    {
-        return Err("invalid command result lengths".into());
+    let (stdout, stderr) = split_payload(data, lengths.stdout_length, lengths.stderr_length, limit)
+        .ok_or("invalid command result lengths")?;
+    match selected_stream(lengths.exit_code, stdout, stderr) {
+        CommandReply::Success(bytes) => Ok(bytes.to_owned()),
+        CommandReply::Rejected(bytes) => {
+            let diagnostic = std::str::from_utf8(bytes).map_err(|e| e.to_string())?;
+            Err(if diagnostic.is_empty() {
+                format!("{name} {command} exited with {}", lengths.exit_code)
+            } else {
+                diagnostic.trim_end_matches('\n').into()
+            })
+        }
     }
-    let (stdout, stderr) = data.split_at(lengths.stdout_length);
-    if lengths.exit_code != 0 {
-        let diagnostic = std::str::from_utf8(stderr).map_err(|e| e.to_string())?;
-        return Err(if diagnostic.is_empty() {
-            format!("{name} {command} exited with {}", lengths.exit_code)
-        } else {
-            diagnostic.trim_end_matches('\n').into()
-        });
-    }
-    Ok(stdout.to_owned())
 }

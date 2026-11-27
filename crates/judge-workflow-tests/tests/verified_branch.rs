@@ -11,6 +11,16 @@ use vstd::prelude::*;
 
 verus! {
 
+#[cfg(verus_keep_ghost)]
+fn required_text_preserves_the_full_nonempty_field() {
+    let valid = policy::branch::required_text(Some("雪"));
+    let empty = policy::branch::required_text(Some(""));
+    let missing = policy::branch::required_text(None);
+    proof { reveal_strlit("雪"); reveal_strlit(""); }
+    assert(valid == Some("雪") && empty.is_none() && missing.is_none());
+}
+
+
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn publishing_requires_the_original_missing_timestamp_diagnostic_and_error_exit() {
     proof {

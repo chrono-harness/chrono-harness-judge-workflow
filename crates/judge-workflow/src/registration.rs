@@ -1,21 +1,43 @@
 //! Consume interpreted registration data while the workflow reader owns its endpoint observations.
+#![allow(unexpected_cfgs)]
+use vstd::contrib::exec_spec::ExecSpecEq;
+use vstd::prelude::*;
+
+verus! {
+pub fn reply_matches(expected: &str, actual: Option<&str>, endpoint_pair_matches: bool) -> (ok: bool)
+    ensures ok == (endpoint_pair_matches && match actual {
+        Some(id) => id@ == expected@, None => false,
+    }),
+{
+    match actual { Some(id) => <&str>::exec_eq(expected, id) && endpoint_pair_matches, None => false }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::{facts, wire::Request};
+#[cfg(not(verus_keep_ghost))]
 use crate::{query, routes::Method};
+#[cfg(not(verus_keep_ghost))]
 use serde::Deserialize;
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::collections::BTreeMap;
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize)]
 pub struct Ambiguity {
     pub repaired: bool,
     pub definitions: Vec<String>,
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize)]
 pub struct RemovedOwner {
     pub kind: String,
     pub id: String,
     pub replacement: Result<Option<String>, String>,
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize)]
 pub struct Changes {
     pub requests: Result<BTreeMap<String, Option<String>>, String>,
@@ -23,6 +45,7 @@ pub struct Changes {
     pub removed_tests: BTreeMap<String, Result<Option<String>, String>>,
     pub removed_owners: Vec<RemovedOwner>,
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize)]
 pub struct Registry {
     pub config: Value,
@@ -37,9 +60,11 @@ pub struct Registry {
     pub conversion: Value,
 }
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Default)]
 pub struct QueryFacts(Vec<(usize, Vec<Value>)>);
 
+#[cfg(not(verus_keep_ghost))]
 impl QueryFacts {
     fn record(&mut self, reader: &facts::Reader, mut extra: Value) -> Result<(), String> {
         let mut original = reader.observation()?;
@@ -79,8 +104,8 @@ impl QueryFacts {
         reader: &facts::Reader,
         replay: bool,
     ) -> Result<Value, String> {
-        let base = reader.snapshot("base")?;
-        let current = reader.snapshot("candidate")?;
+        let base = reader.snapshot(facts::Endpoint::Base)?;
+        let current = reader.snapshot(facts::Endpoint::Candidate)?;
         let config = &current.values[&current.effective_path];
         let judges = current
             .values
@@ -101,9 +126,8 @@ impl QueryFacts {
             &input,
         )?;
         let mut output: Value = req.decode(&raw)?;
-        if output["request_id"] != req.request_id
-            || output["commits"] != json!([req.base.commit, req.candidate.commit])
-        {
+        let same_commits = output["commits"] == json!([req.base.commit, req.candidate.commit]);
+        if !reply_matches(&req.request_id, output["request_id"].as_str(), same_commits) {
             return Err("E_PROTOCOL: registration workflow query identity".into());
         }
         if let Some(extra) = output

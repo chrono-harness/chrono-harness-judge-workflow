@@ -786,7 +786,20 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_branch.rs",
+            "operation": "verify.judge-workflow"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_branch.rs",
+            "operation": "verify.judge-workflow-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/judge-workflow/src/certificate.rs",
@@ -848,7 +861,20 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/judge-workflow/src/installed_judge.rs",
@@ -885,7 +911,20 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_execution.rs",
+            "operation": "verify.judge-workflow-execution"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_execution.rs",
+            "operation": "verify.judge-workflow-execution-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/judge-workflow/src/main.rs",
@@ -897,7 +936,20 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_execution.rs",
+            "operation": "verify.judge-workflow-execution"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_execution.rs",
+            "operation": "verify.judge-workflow-execution-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/judge-workflow/src/projects.rs",
@@ -909,7 +961,20 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/judge-workflow/src/query.rs",
@@ -921,7 +986,20 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/judge-workflow/src/registration.rs",
@@ -933,7 +1011,20 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/judge-workflow/src/routes.rs",
@@ -945,7 +1036,20 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/judge-workflow/src/session.rs",
@@ -957,7 +1061,20 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_evidence.rs",
+            "operation": "verify.judge-workflow-evidence-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/judge-workflow/src/transition.rs",
@@ -969,7 +1086,20 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/judge-workflow/src/verified_transition.rs",
+            "operation": "verify.judge-workflow-transition"
+          },
+          {
+            "path": "crates/judge-workflow-tests/tests/verified_transition.rs",
+            "operation": "verify.judge-workflow-transition-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/judge-workflow/src/verified_branch.rs",

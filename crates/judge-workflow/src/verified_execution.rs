@@ -10,6 +10,13 @@ use vstd::prelude::*;
 #[path = "verified_response.rs"]
 pub mod response;
 
+#[cfg(verus_keep_ghost)]
+#[path = "main.rs"]
+pub mod commands;
+#[cfg(verus_keep_ghost)]
+#[path = "lib.rs"]
+pub mod workflow;
+
 verus! {
 
 /// A collected execution is admissible only when every identity and shape

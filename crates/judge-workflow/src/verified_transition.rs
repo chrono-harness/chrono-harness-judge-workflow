@@ -8,6 +8,10 @@ use vstd::prelude::*;
 
 use vstd::contrib::exec_spec::ExecSpecEq;
 
+#[cfg(verus_keep_ghost)]
+#[path = "transition.rs"]
+pub mod transition;
+
 verus! {
 
 /// Keep the first failure and the exact registered inputs used by the caller.
