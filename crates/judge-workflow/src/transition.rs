@@ -1,10 +1,29 @@
+#![allow(unexpected_cfgs)]
+use vstd::prelude::*;
+
+verus! {
+/// Only changed schema pairs contribute a migration requirement.
+pub fn schema_change(before: u64, after: u64) -> (change: Option<(u64,u64)>)
+    ensures change == if before != after { Some((before,after)) } else { None },
+{
+    if before != after { Some((before,after)) } else { None }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::projects::Results;
+#[cfg(not(verus_keep_ghost))]
 use crate::registration::{Changes, Registry};
+#[cfg(not(verus_keep_ghost))]
 use crate::verified_transition::{self, RetirementError};
+#[cfg(not(verus_keep_ghost))]
 use crate::{facts, wire::Request};
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::collections::{BTreeMap, BTreeSet};
 /// Adjudicate changed/removed identities; unchanged historical records are context.
+#[cfg(not(verus_keep_ghost))]
 pub fn evaluate(
     reader: &facts::Reader,
     req: &Request,
@@ -20,8 +39,8 @@ pub fn evaluate(
         &results.removed,
         &costs["declared_before"],
     )?;
-    let base = reader.snapshot("base")?;
-    let current = reader.snapshot("candidate")?;
+    let base = reader.snapshot(facts::Endpoint::Base)?;
+    let current = reader.snapshot(facts::Endpoint::Candidate)?;
     let (raw, raw_config) = (base.values, base.effective_path);
     let (now, now_config) = (current.values, current.effective_path);
     let mut changes = BTreeSet::new();
@@ -38,8 +57,8 @@ pub fn evaluate(
         };
         let ov = raw[op]["schema_version"].as_u64().unwrap();
         let nv = now[np]["schema_version"].as_u64().unwrap();
-        if ov != nv {
-            changes.insert((ov, nv));
+        if let Some(change) = schema_change(ov, nv) {
+            changes.insert(change);
         }
     }
     let mut migrations = vec![];
@@ -96,6 +115,7 @@ pub fn evaluate(
 }
 
 /// Resolve required repairs before reporting the declared test and owner retirements.
+#[cfg(not(verus_keep_ghost))]
 pub fn retirement_reports(
     changes: Option<&Changes>,
     impact: &Value,
@@ -147,6 +167,7 @@ pub fn retirement_reports(
 }
 
 /// Assemble the workflow report for one removed test from the registered views.
+#[cfg(not(verus_keep_ghost))]
 pub fn retired_test_report(
     node: &str,
     replacement: &Result<Option<String>, String>,

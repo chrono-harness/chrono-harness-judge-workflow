@@ -16,6 +16,15 @@ use vstd::vpanic as panic;
 verus! {
 
 #[cfg(verus_keep_ghost)]
+fn only_an_actual_version_transition_is_returned_with_both_values() {
+    let same = policy::transition::schema_change(7, 7);
+    let forward = policy::transition::schema_change(2, 4);
+    let backward = policy::transition::schema_change(4, 2);
+    assert(same.is_none() && forward == Some((2u64,4u64)) && backward == Some((4u64,2u64)));
+}
+
+
+#[cfg(verus_keep_ghost)]
 fn required_declaration_priority(has_declaration: bool, request_error: bool, has_obligations: bool, message: &str) {
     let c = 11u8; let q = 22u8; let rows = 33u8;
     let requests = if request_error { Err(message) } else { Ok(&q) };

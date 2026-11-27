@@ -1,13 +1,33 @@
-use crate::facts;
-use crate::verified_branch::{self, SourceKind};
-use serde_json::{Value, json};
-use std::{collections::BTreeSet, path::Path};
-use time::{OffsetDateTime, format_description::well_known::Rfc3339};
-fn text<'a>(v: &'a Value, k: &str) -> Result<&'a str, String> {
-    v[k].as_str()
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| format!("E_BRANCH_CONTEXT: missing {k}"))
+#![allow(unexpected_cfgs)]
+use vstd::prelude::*;
+
+verus! {
+/// Empty strings do not supply branch names, Git identities or timestamps.
+pub fn required_text(value: Option<&str>) -> (field: Option<&str>)
+    ensures match value {
+        Some(v) => field == if v@.len() > 0 { Some(v) } else { None },
+        None => field.is_none(),
+    },
+{
+    match value { Some(v) if !v.is_empty() => Some(v), _ => None }
 }
+}
+
+#[cfg(not(verus_keep_ghost))]
+use crate::facts;
+#[cfg(not(verus_keep_ghost))]
+use crate::verified_branch::{self, SourceKind};
+#[cfg(not(verus_keep_ghost))]
+use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
+use std::{collections::BTreeSet, path::Path};
+#[cfg(not(verus_keep_ghost))]
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
+#[cfg(not(verus_keep_ghost))]
+fn text<'a>(v: &'a Value, k: &str) -> Result<&'a str, String> {
+    required_text(v[k].as_str()).ok_or_else(|| format!("E_BRANCH_CONTEXT: missing {k}"))
+}
+#[cfg(not(verus_keep_ghost))]
 fn moment(v: &Value, k: &str) -> Result<OffsetDateTime, String> {
     let d = OffsetDateTime::parse(text(v, k)?, &Rfc3339)
         .map_err(|e| format!("E_BRANCH_CONTEXT: {k}: {e}"))?;
@@ -18,10 +38,12 @@ fn moment(v: &Value, k: &str) -> Result<OffsetDateTime, String> {
 }
 /// Registered observation freshness, shared with the local round producer.
 /// The caller supplies the observation; this predicate never reads a clock.
+#[cfg(not(verus_keep_ghost))]
 pub fn observation_age(ctx: &Value, w: &Value) -> Result<time::Duration, String> {
     age_at(ctx, w, moment(ctx, "observed_at")?)
 }
 /// Check the local context producer's original timestamps with the same policy as the judge.
+#[cfg(not(verus_keep_ghost))]
 pub fn check_observation_age(input: impl std::io::Read) -> Result<(), (u8, String)> {
     let request: Value = serde_json::from_reader(input).map_err(|error| {
         (
@@ -41,6 +63,7 @@ pub fn check_observation_age(input: impl std::io::Read) -> Result<(), (u8, Strin
         })
 }
 /// Admission can observe now without changing the original common context.
+#[cfg(not(verus_keep_ghost))]
 pub fn current_observation_age(
     ctx: &Value,
     w: &Value,
@@ -58,6 +81,7 @@ pub fn current_observation_age(
     }
     age_at(ctx, w, current)
 }
+#[cfg(not(verus_keep_ghost))]
 fn age_at(ctx: &Value, w: &Value, observed: OffsetDateTime) -> Result<time::Duration, String> {
     let age = observed - moment(ctx, "branch_started_at")?;
     let age_ns = verified_branch::checked_age_ns(age.whole_nanoseconds()).map_err(|reason| {
@@ -87,12 +111,14 @@ fn age_at(ctx: &Value, w: &Value, observed: OffsetDateTime) -> Result<time::Dura
     Ok(age)
 }
 /// Fixed Git/context inputs only. No branch discovery, wall clock or commit-date inference.
+#[cfg(not(verus_keep_ghost))]
 pub fn branch(root: &Path, candidate: &str, ctx: &Value, w: &Value) -> Result<Value, String> {
     let reader = facts::Reader::legacy(root)?;
     let result = with_reader(&reader, candidate, ctx, w);
     reader.finish()?;
     result
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn with_reader(
     reader: &facts::Reader,
     candidate: &str,

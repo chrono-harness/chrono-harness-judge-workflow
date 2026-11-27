@@ -1,27 +1,74 @@
 //! Workflow owns freshness, explicit evolution and integration evidence policy.
+#![allow(unexpected_cfgs)]
+use vstd::contrib::exec_spec::ExecSpecEq;
+use vstd::prelude::*;
+
+verus! {
+pub enum RunKind { Integration, Delivery }
+
+pub fn run_kind(kind: Option<&str>, integration_branch: bool) -> (run: Option<RunKind>)
+    ensures run == match kind {
+        Some(s) if s@ == "integration"@ && integration_branch => Some(RunKind::Integration),
+        Some(s) if s@ == "delivery"@ => Some(RunKind::Delivery),
+        _ => None,
+    },
+{
+    match kind {
+        Some(s) if <&str>::exec_eq(s, "integration") && integration_branch => Some(RunKind::Integration),
+        Some(s) if <&str>::exec_eq(s, "delivery") => Some(RunKind::Delivery),
+        _ => None,
+    }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 mod branch;
+#[cfg(not(verus_keep_ghost))]
 mod certificate;
+#[cfg(not(verus_keep_ghost))]
 mod evidence;
+#[cfg(not(verus_keep_ghost))]
 mod installed_judge;
+#[cfg(not(verus_keep_ghost))]
 mod projects;
+#[cfg(not(verus_keep_ghost))]
 mod query;
+#[cfg(not(verus_keep_ghost))]
+pub use query::decode_query_result;
+#[cfg(not(verus_keep_ghost))]
 mod registration;
+#[cfg(not(verus_keep_ghost))]
 mod routes;
+#[cfg(not(verus_keep_ghost))]
 mod transition;
+#[cfg(not(verus_keep_ghost))]
 pub use transition::{retired_test_report, retirement_reports};
+#[cfg(not(verus_keep_ghost))]
 mod verified_branch;
+#[cfg(not(verus_keep_ghost))]
 mod verified_certificate;
+#[cfg(not(verus_keep_ghost))]
 mod verified_evidence;
+#[cfg(not(verus_keep_ghost))]
 mod verified_execution;
+#[cfg(not(verus_keep_ghost))]
 mod verified_transition;
+#[cfg(not(verus_keep_ghost))]
 use crate::routes::Execution;
+#[cfg(not(verus_keep_ghost))]
 pub use branch::{branch, check_observation_age, current_observation_age, observation_age};
+#[cfg(not(verus_keep_ghost))]
 mod facts;
+#[cfg(not(verus_keep_ghost))]
 mod session;
+#[cfg(not(verus_keep_ghost))]
 mod wire;
+#[cfg(not(verus_keep_ghost))]
 use crate::wire::{Request, Status};
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json as value};
 
+#[cfg(not(verus_keep_ghost))]
 pub fn evaluate_original(
     input: impl std::io::Read,
     mut output: impl std::io::Write,
@@ -70,6 +117,7 @@ pub fn evaluate_original(
     )
     .map_err(|e| e.to_string())
 }
+#[cfg(not(verus_keep_ghost))]
 fn evaluate(
     req: &Request,
     reader: &facts::Reader,
@@ -95,11 +143,8 @@ fn evaluate(
         state["age_seconds"] = value!(age.as_seconds_f64());
         state["current_observation"] = observation.clone();
     }
-    if !matches!(ctx["run_kind"].as_str(), Some("integration" | "delivery"))
-        || (ctx["run_kind"] == "integration" && state["kind"] != "integration")
-    {
-        return Err("E_BRANCH_CONTEXT: invalid explicit run kind".into());
-    }
+    let kind = run_kind(ctx["run_kind"].as_str(), state["kind"] == "integration")
+        .ok_or("E_BRANCH_CONTEXT: invalid explicit run kind")?;
     let impact = evidence::output(req, "impact")?;
     if impact["schema"] != "chrono-filemap-impact/v6"
         || impact["delta"] != serde_json::to_value(&req.delta).unwrap()
@@ -149,7 +194,7 @@ fn evaluate(
         evidence::output(req, "costs")?,
     )?;
     certificate::validate_bind(&b)?;
-    let (mode, integration) = if ctx["run_kind"] == "integration" {
+    let (mode, integration) = if matches!(kind, RunKind::Integration) {
         (
             "integration_run",
             certificate::produce(req, &b, &ctx, binding, &plan, &results, effective)?,
