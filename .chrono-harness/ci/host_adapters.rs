@@ -64,9 +64,9 @@ pub fn deployed_tool_installer() -> (source: &'static str) {
 }
 
 pub fn installer_digest_matches(digest: &String) -> (accepted: bool)
-    ensures accepted == (digest@ == "463052d115cab6d117f83b7546ee3c9481f42ab210c4347833668f84eb6d1941"@),
+    ensures accepted == (digest@ == "39566b5b467e31e09edb73ffc0c79b6c719ef0f59b684df9c165bfb66048af47"@),
 {
-    *digest == "463052d115cab6d117f83b7546ee3c9481f42ab210c4347833668f84eb6d1941".to_string()
+    *digest == "39566b5b467e31e09edb73ffc0c79b6c719ef0f59b684df9c165bfb66048af47".to_string()
 }
 
 }
