@@ -236,7 +236,7 @@ pub fn consume(
                 "collected producer metadata and original streams exceed registered bound".into(),
             );
         }
-        if !matches!(report["status"].as_str(), Some("pass" | "warn"))
+        if !verified_certificate::admit_report_status(report["status"].as_str())
             || report["report_path"] != report_path
             || report["base"] != req.base.commit
             || report["candidate"] != candidate

@@ -153,6 +153,23 @@ fn all_invalid_binding_facts_are_rejected() {
     assert(!admitted);
 }
 
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn report_status_admission_matches_delivery_policy() {
+    proof {
+        reveal_strlit("pass");
+        reveal_strlit("warn");
+        reveal_strlit("error");
+        reveal_strlit("fail");
+        assert("error"@[0] != "pass"@[0] && "error"@[0] != "warn"@[0]);
+        assert("fail"@[0] != "pass"@[0] && "fail"@[0] != "warn"@[0]);
+    }
+    expect(policy::admit_report_status(Some("pass")));
+    expect(policy::admit_report_status(Some("warn")));
+    expect(!policy::admit_report_status(Some("error")));
+    expect(!policy::admit_report_status(Some("fail")));
+    expect(!policy::admit_report_status(None));
+}
+
 }
 
 #[cfg(not(verus_keep_ghost))]
