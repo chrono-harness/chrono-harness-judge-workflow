@@ -104,6 +104,12 @@ fn report_output<'a>(report: &'a Value, key: &str) -> Result<&'a Value, String> 
     verified_certificate::agreed_output(&values, |_| true, |a, b| values[a] == values[b])
         .ok_or_else(|| format!("missing/conflicting report {key}"))
 }
+
+#[cfg(not(verus_keep_ghost))]
+fn matching_values(pairs: &[(&Value, &Value)]) -> bool {
+    verified_certificate::first_mismatch(pairs.len(), |i| pairs[i].0 == pairs[i].1).is_none()
+}
+
 #[cfg(not(verus_keep_ghost))]
 pub fn consume(
     queries: &mut crate::registration::QueryFacts,
@@ -126,11 +132,13 @@ pub fn consume(
     req.artifact::<()>(value!({"operation":"retain-read","path":relative}))?;
     let bytes = fs::read(path).map_err(|e| format!("E_INTEGRATION_REQUIRED: {e}"))?;
     let mut check = || -> Result<Value, String> {
-        if sha256(&bytes) != digest {
-            return Err("certificate byte digest differs".into());
-        }
+        crate::verified_evidence::bind_digest((), &sha256(&bytes), digest)
+            .map_err(|()| "certificate byte digest differs")?;
         let c: Value = req.decode(&bytes)?;
-        if c["schema_version"] != 1 || c["status"] != "passed" {
+        if !verified_certificate::admit_certificate_header(
+            c["schema_version"].as_u64(),
+            c["status"].as_str(),
+        ) {
             return Err("certificate did not succeed".into());
         }
         let fields = verified_certificate::binding_fields();
@@ -149,11 +157,15 @@ pub fn consume(
             return Err("producer candidate tree differs".into());
         }
         let old_ctx = &proof["context"];
-        if old_ctx["schema_version"] != 2
-            || old_ctx["run_kind"] != "integration"
-            || old_ctx["candidate"] != candidate
-            || wire::digest(old_ctx)? != producer["context_digest"]
-        {
+        if !verified_certificate::admit_producer_context(
+            old_ctx["schema_version"].as_u64(),
+            old_ctx["run_kind"].as_str(),
+            old_ctx["candidate"].as_str(),
+            candidate,
+        ) || !matching_values(&[(
+            &Value::String(wire::digest(old_ctx)?),
+            &producer["context_digest"],
+        )]) {
             return Err("producer context differs".into());
         }
         let fields = producer_fields();
@@ -169,9 +181,11 @@ pub fn consume(
                 v["observed_at"].as_str().unwrap_or(""),
                 &time::format_description::well_known::Rfc3339,
             )
+            .map(|timestamp| timestamp.unix_timestamp_nanos())
             .map_err(|e| e.to_string())
         };
-        if timestamp(old_ctx)? > timestamp(ctx)? {
+        let producer_time = timestamp(old_ctx)?;
+        if !crate::verified_branch::current_observation_allowed(timestamp(ctx)?, producer_time) {
             return Err("producer observation is in the future".into());
         }
         let mut now = old_ctx.clone();
@@ -188,23 +202,27 @@ pub fn consume(
             serde_json::from_value(proof["plan"].clone()).map_err(|e| e.to_string())?;
         let results = projects::read(req, r, &proof["results"])?;
         evidence::execution(req, r, &plan, &results)?;
-        if c["results_digest"] != wire::digest(&results.wire)?
-            || plan.root != Path::new(producer["root"].as_str().ok_or("producer root")?)
-            || plan.binding["candidate"] != candidate
-            || plan.binding["base"] != req.base.commit
-            || plan.binding["registry"] != req.registries.digest
-            || plan.binding["context"] != producer["context_digest"]
+        if !matching_values(&[(
+            &c["results_digest"],
+            &Value::String(wire::digest(&results.wire)?),
+        )]) || plan.root != Path::new(producer["root"].as_str().ok_or("producer root")?)
+            || !matching_values(&[
+                (&plan.binding["candidate"], &value!(candidate)),
+                (&plan.binding["base"], &value!(req.base.commit)),
+                (&plan.binding["registry"], &value!(req.registries.digest)),
+                (&plan.binding["context"], &producer["context_digest"]),
+            ])
         {
             return Err("producer plan/results binding differs".into());
         }
-        if evidence::inputs(
+        let retained_inputs = evidence::inputs(
             &proof["effective_inputs"],
             &req.base.commit,
             candidate,
             &req.candidate.tree,
             &plan.root,
-        )? != c["effective_inputs"]
-        {
+        )?;
+        if !matching_values(&[(&retained_inputs, &c["effective_inputs"])]) {
             return Err("retained effective inputs differ".into());
         }
         let report_path = producer["report_path"]
@@ -214,43 +232,56 @@ pub fn consume(
         let physical:String=req.artifact(value!({"operation":"resolve-original","original":{"path":report_path,"sha256":""},"transport":null}))?;
         let report_file: std::path::PathBuf =
             req.artifact(value!({"operation":"checked-path","path":physical}))?;
-        if results.results.completion.is_some()
-            && fs::metadata(&report_file).map_err(|e| e.to_string())?.len()
-                > r.config["execution_units"]["collection_limits"]["report_bytes"]
-                    .as_u64()
-                    .ok_or("collected producer report bound")?
-        {
-            return Err("collected producer report exceeds registered bound".into());
+        let collection_limit = || {
+            r.config["execution_units"]["collection_limits"]["report_bytes"]
+                .as_u64()
+                .ok_or("collected producer report bound")
+        };
+        if results.results.completion.is_some() {
+            let bytes = fs::metadata(&report_file).map_err(|e| e.to_string())?.len();
+            if !verified_certificate::report_fits(bytes, collection_limit()?) {
+                return Err("collected producer report exceeds registered bound".into());
+            }
         }
         req.artifact::<()>(value!({"operation":"retain-read","path":physical}))?;
         let report_bytes = fs::read(&report_file)
             .map_err(|e| format!("producer report absent/not finalized: {e}"))?;
         let report: Value = req.decode(&report_bytes)?;
-        if results.results.completion.is_some()
-            && req.evidence::<u64>(value!({"operation":"report-transport-bytes","report":report,"metadata_bytes":report_bytes.len()}))?
-                > r.config["execution_units"]["collection_limits"]["report_bytes"]
-                    .as_u64()
-                    .ok_or("collected producer report bound")?
-        {
-            return Err(
-                "collected producer metadata and original streams exceed registered bound".into(),
-            );
+        if results.results.completion.is_some() {
+            let bytes: u64 = req.evidence(value!({
+                "operation":"report-transport-bytes","report":report,"metadata_bytes":report_bytes.len()
+            }))?;
+            if !verified_certificate::report_fits(bytes, collection_limit()?) {
+                return Err(
+                    "collected producer metadata and original streams exceed registered bound"
+                        .into(),
+                );
+            }
         }
         if !verified_certificate::admit_report_status(report["status"].as_str())
-            || report["report_path"] != report_path
-            || report["base"] != req.base.commit
-            || report["candidate"] != candidate
-            || report["candidate_tree"] != req.candidate.tree
-            || report["registry_digest"] != req.registries.digest
-            || report["context_digest"] != producer["context_digest"]
+            || !matching_values(&[
+                (&report["report_path"], &value!(report_path)),
+                (&report["base"], &value!(req.base.commit)),
+                (&report["candidate"], &value!(candidate)),
+                (&report["candidate_tree"], &value!(req.candidate.tree)),
+                (&report["registry_digest"], &value!(req.registries.digest)),
+                (&report["context_digest"], &producer["context_digest"]),
+            ])
         {
             return Err("producer runner did not finalize a matching successful report".into());
         }
-        if report_output(&report, "execution_plan")? != &proof["plan"]
-            || report_output(&report, "tests")? != &proof["results"]
-            || report_output(&report, "effective_inputs")? != &proof["effective_inputs"]
+        let expected = [
+            &proof["plan"],
+            &proof["results"],
+            &proof["effective_inputs"],
+        ];
+        for (key, expected) in verified_certificate::report_outputs()
+            .into_iter()
+            .zip(expected)
         {
-            return Err("producer report outputs differ".into());
+            if !matching_values(&[(report_output(&report, key)?, expected)]) {
+                return Err("producer report outputs differ".into());
+            }
         }
         let expanded = report["judges"]
             .as_array()
@@ -266,7 +297,10 @@ pub fn consume(
                 serde_json::from_value(report["request"].clone()).map_err(|e| e.to_string())?;
             req.evidence::<()>(value!({"operation":"validate-request","request":original}))?;
             if original.candidate.root != plan.root
-                || original.context.sha256 != producer["context_digest"]
+                || !matching_values(&[(
+                    &value!(original.context.sha256),
+                    &producer["context_digest"],
+                )])
             {
                 return Err("collected producer request differs".into());
             }
@@ -287,30 +321,35 @@ pub fn consume(
                         .cloned()
                 })
                 .collect();
-            if report["status"] != parsed["status"] || report["findings"] != value!(findings) {
+            if !matching_values(&[
+                (&report["status"], &parsed["status"]),
+                (&report["findings"], &value!(findings)),
+            ]) {
                 return Err("collected producer summary differs from actual judges".into());
             }
             let original: Request =
                 serde_json::from_value(parsed["request"].clone()).map_err(|e| e.to_string())?;
-            if original.request_id != producer["request_id"]
-                || original.impact != req.impact
-                || plan.binding
-                    != routes::context(
-                        req,
-                        r,
-                        &original,
-                        &proof["effective_inputs"],
-                        &Default::default(),
-                    )?
-                    .binding
-            {
+            if !matching_values(&[
+                (&value!(original.request_id), &producer["request_id"]),
+                (&original.impact, &req.impact),
+            ]) || !matching_values(&[(
+                &plan.binding,
+                &routes::context(
+                    req,
+                    r,
+                    &original,
+                    &proof["effective_inputs"],
+                    &Default::default(),
+                )?
+                .binding,
+            )]) {
                 return Err("collected producer stdin/global obligation binding differs".into());
             }
             let current_plan: Execution =
                 serde_json::from_value(evidence::output(req, "execution_plan")?.clone())
                     .map_err(|e| e.to_string())?;
             let expected = routes::collection(req, r, &plan, &current_plan)?;
-            if expected != proof["plan"] {
+            if !matching_values(&[(&expected, &proof["plan"])]) {
                 return Err("collected global declaration plan differs".into());
             }
             // Retain the workflow reader's observations for the fixed registration endpoints.
@@ -325,7 +364,7 @@ pub fn consume(
             )?;
         }
         let observations = proof["judges"].as_array().ok_or("producer observations")?;
-        if records.len() != observations.len() + 1 {
+        if !verified_certificate::judge_count_matches(records.len(), observations.len()) {
             return Err("producer judge set differs".into());
         }
         for old in observations {
@@ -336,10 +375,18 @@ pub fn consume(
                 records[i]["id"] == old["id"]
             })
             .ok_or("producer judge observation missing/duplicate")?;
-            for (k, v) in old.as_object().ok_or("producer observation")? {
-                if records[index][k] != *v {
-                    return Err("producer observation changed".into());
-                }
+            let fields: Vec<_> = old
+                .as_object()
+                .ok_or("producer observation")?
+                .iter()
+                .collect();
+            if verified_certificate::first_mismatch(fields.len(), |i| {
+                let (key, original) = fields[i];
+                &records[index][key] == original
+            })
+            .is_some()
+            {
+                return Err("producer observation changed".into());
             }
         }
         let mut seen = BTreeSet::new();
@@ -360,7 +407,7 @@ pub fn consume(
                 value!({"path":evidence::relative(&plan.root,&p.executable),"sha256":p.sha256}),
             );
         }
-        if Value::Object(executable_map) != c["executables"] {
+        if !matching_values(&[(&Value::Object(executable_map), &c["executables"])]) {
             return Err("producer executable observations differ".into());
         }
         let index = verified_certificate::unique_record(records.len(), |i| {

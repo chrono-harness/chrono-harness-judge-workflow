@@ -219,6 +219,16 @@ fn each_collected_execution_fact_is_required() {
 }
 
 #[cfg_attr(not(verus_keep_ghost), test)]
+fn two_required_units_need_distinct_matching_reports() {
+    expect(policy::admit_unit_coverage(2, 2, 2, true, 2));
+    expect(policy::admit_unit_coverage(2, 2, 3, true, 2));
+    expect(!policy::admit_unit_coverage(2, 1, 2, true, 1));
+    expect(!policy::admit_unit_coverage(2, 2, 2, false, 2));
+    expect(!policy::admit_unit_coverage(2, 2, 1, true, 1));
+    expect(!policy::admit_unit_coverage(2, 2, 2, true, 1));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
 fn ordinary_execution_requires_every_fact() {
     let admitted = policy::admit_execution(true, true, true, true, true, true);
     let plan = policy::admit_execution(false, true, true, true, true, true);

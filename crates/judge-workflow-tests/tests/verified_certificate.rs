@@ -170,6 +170,64 @@ fn report_status_admission_matches_delivery_policy() {
     expect(!policy::admit_report_status(None));
 }
 
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn certificate_header_requires_both_version_and_passed_status() {
+    proof {
+        reveal_strlit("passed"); reveal_strlit("pass");
+        assert("pass"@.len() != "passed"@.len());
+    }
+    expect(policy::admit_certificate_header(Some(1), Some("passed")));
+    expect(!policy::admit_certificate_header(Some(2), Some("passed")));
+    expect(!policy::admit_certificate_header(None, Some("passed")));
+    expect(!policy::admit_certificate_header(Some(1), Some("pass")));
+    expect(!policy::admit_certificate_header(Some(1), None));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn retained_context_requires_integration_for_the_actual_producer() {
+    proof {
+        reveal_strlit("integration"); reveal_strlit("delivery");
+        reveal_strlit("candidate"); reveal_strlit("different");
+        assert("delivery"@[0] != "integration"@[0]);
+        assert("candidate"@[0] != "different"@[0]);
+    }
+    expect(policy::admit_producer_context(Some(2), Some("integration"), Some("candidate"), "candidate"));
+    expect(!policy::admit_producer_context(Some(1), Some("integration"), Some("candidate"), "candidate"));
+    expect(!policy::admit_producer_context(Some(2), Some("delivery"), Some("candidate"), "candidate"));
+    expect(!policy::admit_producer_context(Some(2), Some("integration"), Some("different"), "candidate"));
+    expect(!policy::admit_producer_context(Some(2), Some("integration"), None, "candidate"));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn collected_report_budget_includes_the_exact_boundary() {
+    expect(policy::report_fits(0, 0));
+    expect(policy::report_fits(11, 12));
+    expect(policy::report_fits(12, 12));
+    expect(!policy::report_fits(13, 12));
+    expect(policy::report_fits(u64::MAX, u64::MAX));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn retained_judges_include_exactly_one_additional_record() {
+    expect(policy::judge_count_matches(1, 0));
+    expect(policy::judge_count_matches(7, 6));
+    expect(!policy::judge_count_matches(6, 6));
+    expect(!policy::judge_count_matches(8, 6));
+    expect(!policy::judge_count_matches(0, usize::MAX));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn retained_report_reads_plan_then_results_then_inputs() {
+    use vstd::contrib::exec_spec::ExecSpecEq;
+    let fields = policy::report_outputs();
+    proof {
+        reveal_strlit("execution_plan"); reveal_strlit("tests"); reveal_strlit("effective_inputs");
+    }
+    expect(<&str>::exec_eq(fields[0], "execution_plan"));
+    expect(<&str>::exec_eq(fields[1], "tests"));
+    expect(<&str>::exec_eq(fields[2], "effective_inputs"));
+}
+
 }
 
 #[cfg(not(verus_keep_ghost))]

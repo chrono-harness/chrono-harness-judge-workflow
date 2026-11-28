@@ -161,17 +161,14 @@ fn execution_inner(
                 .as_str()
                 .is_some_and(|unit| report_units.insert(unit.to_owned()))
         });
-        if required.len() != completion.required_units.len()
-            || !unique_reports
-            || completion.reports.len() < required.len()
-            || completion
-                .reports
-                .iter()
-                .filter_map(|report| report["unit"].as_str())
-                .filter(|unit| required.contains(*unit))
-                .collect::<BTreeSet<_>>()
-                != required.iter().map(String::as_str).collect::<BTreeSet<_>>()
-        {
+        let matched_required = report_units.intersection(&required).count();
+        if !verified_execution::admit_unit_coverage(
+            completion.required_units.len(),
+            required.len(),
+            completion.reports.len(),
+            unique_reports,
+            matched_required,
+        ) {
             return Err("E_WORKFLOW_EVIDENCE: collected unit coverage is incomplete".into());
         }
         return Ok(());
