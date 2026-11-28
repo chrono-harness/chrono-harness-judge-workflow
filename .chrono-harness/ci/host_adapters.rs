@@ -59,6 +59,11 @@ pub fn installed_config() -> (s: &'static str) {
     include_str!("../../.config/mise/conf.d/selected-chrono-harness.toml")
 }
 
+/// Bind the running host adapter to this existing Verus operation.
+pub fn native_compiler_check() -> &'static str {
+    include_str!("../native-check.sh")
+}
+
 pub fn deployed_tool_installer() -> (source: &'static str) {
     include_str!("../install-tools.sh")
 }
@@ -74,6 +79,16 @@ pub fn installer_digest_matches(digest: &String) -> (accepted: bool)
 #[cfg(not(verus_keep_ghost))]
 mod native {
     use super::*;
+
+    #[test]
+    fn native_compiler_check_uses_the_installed_selector_before_source_verification() {
+        let script = native_compiler_check();
+        let selector = r#"chrono-host-bootstrap select-native-cargo-library "$(pwd -P)/$product" "$scratch/build.jsonl""#;
+        let source_check = r#"chrono-host-bootstrap check-compiler-sources native "$stem""#;
+        let selection = script.find(selector).expect("registered Cargo selector");
+        let verification = script.find(source_check).expect("registered source check");
+        assert!(selection < verification);
+    }
 
     #[test]
     fn deployed_tool_installer_matches_the_selected_template() {

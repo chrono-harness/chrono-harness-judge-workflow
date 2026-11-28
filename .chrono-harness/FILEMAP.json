@@ -181,7 +181,16 @@
           "kind": "test-execution",
           "to": "test:judge-workflow-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": ".chrono-harness/ci/host_adapters.rs",
+            "operation": "verify.host-adapters"
+          }
+        ]
+      }
     },
     {
       "path": ".chrono-harness/pr.json",
