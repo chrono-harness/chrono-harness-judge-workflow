@@ -79,6 +79,20 @@ pub fn admit_collected(
         && test_statuses
 }
 
+pub fn admit_unit_coverage(
+    required: usize,
+    distinct_required: usize,
+    reports: usize,
+    unique_reports: bool,
+    matched_required: usize,
+) -> (admitted: bool)
+    ensures admitted == (required == distinct_required && unique_reports
+        && reports >= distinct_required && matched_required == distinct_required),
+{
+    required == distinct_required && unique_reports
+        && reports >= distinct_required && matched_required == distinct_required
+}
+
 /// A non-collected execution is admissible only when its plan, scope,
 /// selected tests, statuses and operation count agree with the plan.
 pub open spec fn execution_admissible(

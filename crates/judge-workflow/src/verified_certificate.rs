@@ -148,6 +148,47 @@ pub fn admit_report_status(status: Option<&str>) -> (admitted: bool)
     }
 }
 
+pub fn admit_certificate_header(schema: Option<u64>, status: Option<&str>) -> (admitted: bool)
+    ensures admitted == (schema == Some(1u64) && status.is_some() && status.unwrap()@ == "passed"@),
+{
+    schema == Some(1u64) && match status {
+        Some(status) => <&str>::exec_eq(status, "passed"),
+        None => false,
+    }
+}
+
+pub fn admit_producer_context(schema: Option<u64>, kind: Option<&str>,
+    candidate: Option<&str>, producer: &str) -> (admitted: bool)
+    ensures admitted == (schema == Some(2u64)
+        && kind.is_some() && kind.unwrap()@ == "integration"@
+        && candidate.is_some() && candidate.unwrap()@ == producer@),
+{
+    schema == Some(2u64) && match (kind, candidate) {
+        (Some(kind), Some(candidate)) => <&str>::exec_eq(kind, "integration")
+            && <&str>::exec_eq(candidate, producer),
+        _ => false,
+    }
+}
+
+pub fn report_fits(bytes: u64, limit: u64) -> (admitted: bool)
+    ensures admitted == (bytes <= limit),
+{
+    bytes <= limit
+}
+
+pub fn report_outputs() -> (fields: [&'static str; 3])
+    ensures fields[0]@ == "execution_plan"@, fields[1]@ == "tests"@,
+        fields[2]@ == "effective_inputs"@,
+{
+    ["execution_plan", "tests", "effective_inputs"]
+}
+
+pub fn judge_count_matches(records: usize, observations: usize) -> (admitted: bool)
+    ensures admitted == (records as int == observations as int + 1),
+{
+    records > 0 && records - 1 == observations
+}
+
 /// A certificate binding is admissible only when its cardinality and exact
 /// field-set checks both hold in the concrete adapter.
 pub open spec fn binding_admissible(
