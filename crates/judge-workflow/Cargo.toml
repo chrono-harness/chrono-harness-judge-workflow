@@ -18,7 +18,7 @@ bench = false
 hex = "0.4"
 digest-io = "0.1"
 libc = "0.2"
-vstd = "=0.0.0-2026-04-20-1748"
+vstd = "=0.0.0-2026-11-22-0344"
 sha2 = "0.11"
 serde_jcs = "=0.4.0"
 serde = { version = "1", features = ["derive"] }
