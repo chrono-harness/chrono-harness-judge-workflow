@@ -128,6 +128,26 @@ pub fn producer_claim(request_matches: bool, mode: Option<&str>, claim: Option<&
     }
 }
 
+/// A retained runner report is consumable only for a successful report status.
+pub open spec fn report_status_admissible(status: Seq<char>) -> bool {
+    status == "pass"@ || status == "warn"@
+}
+
+/// Consume the concrete report status through the proved delivery decision.
+pub fn admit_report_status(status: Option<&str>) -> (admitted: bool)
+    ensures admitted == match status {
+        Some(status) => report_status_admissible(status@),
+        None => false,
+    },
+{
+    match status {
+        Some(status) => {
+            <&str>::exec_eq(status, "pass") || <&str>::exec_eq(status, "warn")
+        }
+        None => false,
+    }
+}
+
 /// A certificate binding is admissible only when its cardinality and exact
 /// field-set checks both hold in the concrete adapter.
 pub open spec fn binding_admissible(
